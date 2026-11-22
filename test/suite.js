@@ -378,7 +378,7 @@
     t(G8, 'the reach estimate is repeatable and consistent with the matcher', function () {
       var h1 = setup(), h2 = setup(), r = rule({ must: [{ field: 'device.geo.region', in: ['IN-WB', 'IN-OD', 'IN-DL'] }, rule().must[1], rule().must[2]] });
       var a = submitRadius(h1, 'seg_a', r).estimated_reach, b = submitRadius(h2, 'seg_a', r).estimated_reach;
-      assert.deepEqual(a, b); assert.ok(a.before_per_day > 0 && a.after_per_day <= 20000000);
+      assert.equal(JSON.stringify(a), JSON.stringify(b), 'two runs of the estimate differ'); assert.ok(a.before_per_day > 0 && a.after_per_day <= 20000000);
     });
     t(G8, 'the simulated sample spreads over many sites, so one excluded site cannot wipe out the reach', function () {
       var h = setup(), base = rule();
@@ -419,6 +419,7 @@
   var mini = {
     ok: function (v, m) { if (!v) throw new Error(m || 'expected truthy'); },
     equal: function (a, b, m) { if (a !== b) throw new Error((m ? m + ': ' : '') + 'expected ' + JSON.stringify(b) + ' but got ' + JSON.stringify(a)); },
+    deepEqual: function (a, b, m) { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error((m ? m + ': ' : '') + 'expected ' + JSON.stringify(b) + ' but got ' + JSON.stringify(a)); },
     notEqual: function (a, b, m) { if (a === b) throw new Error((m ? m + ': ' : '') + 'expected values to differ, both ' + JSON.stringify(a)); }
   };
   return { build: build, run: run, mini: mini };
