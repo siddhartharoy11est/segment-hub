@@ -1,0 +1,12 @@
+{
+  "name": "segment-hub",
+  "version": "1.0.0",
+  "description": "Internal API for targeting segments: control plane prototype (Media.net APM case, Topic 3)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/run.js && node test/about.test.js"
+  },
+  "engines": { "node": ">=18" },
+  "license": "UNLICENSED"
+}

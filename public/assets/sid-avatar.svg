@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160" role="img" aria-label="Illustration of Sid: a smiling man with short spiky black hair, light stubble and a blue hoodie">
+  <defs>
+    <clipPath id="face"><path d="M44 78 Q44 44 80 44 Q116 44 116 78 L116 96 Q116 126 80 128 Q44 126 44 96 Z"/></clipPath>
+    <pattern id="stub" width="4" height="4" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r=".7" fill="#1b1a1a" opacity=".4"/><circle cx="3" cy="3" r=".7" fill="#1b1a1a" opacity=".3"/></pattern>
+    <clipPath id="circ"><circle cx="80" cy="80" r="80"/></clipPath>
+  </defs>
+  <g clip-path="url(#circ)">
+    <rect width="160" height="160" fill="#dbe8f8"/>
+    <!-- hood behind neck -->
+    <ellipse cx="80" cy="134" rx="44" ry="15" fill="#143f78"/>
+    <!-- shoulders / hoodie -->
+    <path d="M14 160 Q18 136 54 130 L106 130 Q142 136 146 160 Z" fill="#256abf"/>
+    <path d="M54 130 Q80 156 106 130 Q104 142 80 150 Q56 142 54 130 Z" fill="#1c5cab"/>
+    <!-- drawstrings -->
+    <path d="M71 143 L69 158" stroke="#f4f3f0" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M89 143 L91 158" stroke="#f4f3f0" stroke-width="2.6" stroke-linecap="round"/>
+    <!-- neck -->
+    <path d="M66 112 L94 112 L96 134 Q80 146 64 134 Z" fill="#d9a98a"/>
+    <!-- ears -->
+    <ellipse cx="44" cy="86" rx="5.5" ry="8.5" fill="#e3b394"/>
+    <ellipse cx="116" cy="86" rx="5.5" ry="8.5" fill="#e3b394"/>
+    <!-- face -->
+    <path d="M44 78 Q44 44 80 44 Q116 44 116 78 L116 96 Q116 126 80 128 Q44 126 44 96 Z" fill="#efc7a8"/>
+    <!-- stubble on jaw and upper lip -->
+    <g clip-path="url(#face)">
+      <path d="M44 90 Q46 126 80 130 Q114 126 116 90 Q108 112 80 112 Q52 112 44 90 Z" fill="url(#stub)"/>
+      <path d="M44 90 Q46 126 80 130 Q114 126 116 90 Q108 112 80 112 Q52 112 44 90 Z" fill="#1b1a1a" opacity=".10"/>
+      <path d="M64 97 Q80 92 96 97 Q80 100 64 97 Z" fill="url(#stub)"/>
+    </g>
+    <!-- cheeks -->
+    <ellipse cx="57" cy="97" rx="7" ry="4.5" fill="#e48e7e" opacity=".35"/>
+    <ellipse cx="103" cy="97" rx="7" ry="4.5" fill="#e48e7e" opacity=".35"/>
+    <!-- hair -->
+    <path d="M43 78 Q38 52 56 43 L55 33 L64 39 L70 28 L79 37 L88 27 L93 37 L102 31 L104 42 Q124 50 117 78 Q113 63 101 59 Q80 52 59 59 Q47 63 43 78 Z" fill="#1b1a1a" stroke="#1b1a1a" stroke-width="3" stroke-linejoin="round"/>
+    <!-- brows -->
+    <path d="M58 70 Q66 65 74 68" stroke="#1b1a1a" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M86 68 Q94 65 102 70" stroke="#1b1a1a" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <!-- laughing eyes -->
+    <path d="M60 83 Q67 74 74 83" stroke="#1b1a1a" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+    <path d="M86 83 Q93 74 100 83" stroke="#1b1a1a" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+    <!-- nose -->
+    <path d="M78 88 Q76 95 81 96" stroke="#c9946f" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <!-- grin -->
+    <path d="M58 100 Q80 95 102 100 Q99 124 80 124 Q61 124 58 100 Z" fill="#5a1f22"/>
+    <path d="M60 101 Q80 96 100 101 L98.5 108 Q80 112 61.5 108 Z" fill="#ffffff"/>
+    <path d="M68 118 Q80 111 92 118 Q86 124 80 124 Q74 124 68 118 Z" fill="#d9626d"/>
+  </g>
+</svg>

@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Segment Hub: internal API for targeting segments</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#1b2430;--mut:#5d6b7c;--line:#dfe3e8;--acc:#1f5eff;--acc-ink:#fff;
+--ok:#14803c;--ok-bg:#e3f5e9;--warn:#946200;--warn-bg:#fff3d6;--bad:#b3261e;--bad-bg:#fde7e5;--info:#1f5eff;--info-bg:#e6edff;--code:#f0f2f5}
+@media (prefers-color-scheme:dark){:root{--bg:#12161c;--card:#1a2029;--ink:#e6eaf0;--mut:#9aa7b8;--line:#2b3441;--acc:#6b95ff;--acc-ink:#0b1220;
+--ok:#59d68a;--ok-bg:#16301f;--warn:#f0c15a;--warn-bg:#3a2e12;--bad:#ff8c84;--bad-bg:#3b1a18;--info:#8fb0ff;--info-bg:#1b2742;--code:#222a35}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{padding:14px 20px;border-bottom:1px solid var(--line);background:var(--card);display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+header h1{font-size:18px;margin:0}
+header .sub{color:var(--mut);font-size:13px}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px}
+select,input,textarea,button{font:inherit;color:inherit}
+select,input[type=text],textarea{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+textarea{width:100%;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.45}
+button{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 11px;cursor:pointer}
+button:hover{border-color:var(--acc)}
+button.pri{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+button.sm{padding:3px 8px;font-size:12.5px}
+button:disabled{opacity:.5;cursor:default}
+nav{display:flex;gap:4px;padding:8px 20px 0;overflow-x:auto;border-bottom:1px solid var(--line);background:var(--card)}
+nav button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:9px 12px;white-space:nowrap;color:var(--mut)}
+nav button.on{color:var(--ink);border-bottom-color:var(--acc);font-weight:600}
+main{max-width:1100px;margin:0 auto;padding:18px 20px 90px}
+h2{font-size:17px;margin:0 0 4px}
+h3{font-size:14px;margin:14px 0 6px}
+p.lead{color:var(--mut);margin:2px 0 14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:0 0 12px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.grid{display:grid;gap:12px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.chip{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.good{background:var(--ok-bg);color:var(--ok)}.warn{background:var(--warn-bg);color:var(--warn)}.bad{background:var(--bad-bg);color:var(--bad)}.info{background:var(--info-bg);color:var(--info)}.grey{background:var(--code);color:var(--mut)}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.tile b{display:block;font-size:24px;line-height:1.2}.tile span{color:var(--mut);font-size:12.5px}
+pre{background:var(--code);border-radius:8px;padding:10px;overflow:auto;font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;margin:6px 0;max-height:340px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--mut);font-weight:600;font-size:12px}
+.scroll{overflow-x:auto}
+.verdict{border-radius:10px;padding:10px 12px;margin:8px 0;font-weight:600}
+.verdict.good{background:var(--ok-bg);color:var(--ok)}.verdict.warn{background:var(--warn-bg);color:var(--warn)}.verdict.bad{background:var(--bad-bg);color:var(--bad)}.verdict.info{background:var(--info-bg);color:var(--info)}
+.muted{color:var(--mut)}.small{font-size:12.5px}
+details>summary{cursor:pointer;color:var(--mut);font-size:13px;margin:6px 0}
+.toast{position:fixed;right:14px;top:14px;max-width:420px;padding:10px 14px;border-radius:10px;font-size:13.5px;box-shadow:0 6px 24px rgba(0,0,0,.25);z-index:50}
+footer{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:6px 20px;font-size:12.5px;z-index:20;max-height:50vh;overflow:auto}
+footer .calls{display:flex;flex-direction:column;gap:2px;margin-top:6px}
+footer .call{cursor:pointer;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+body.logopen main{padding-bottom:56vh}
+@media(max-width:640px){.two{grid-template-columns:1fr}header{padding:12px}main{padding:14px 12px 90px}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Segment Hub</h1>
+    <div class="sub">Internal API for targeting segments. A control-plane prototype for the Media.net APM case.</div>
+  </div>
+  <div class="ctl">
+    <span id="mode" class="chip grey">connecting</span>
+    <label>Acting as <select id="actor"></select></label>
+    <span class="muted" id="clock"></span>
+    <button id="reset" class="sm">Reset demo</button>
+  </div>
+</header>
+<nav id="tabs"></nav>
+<main id="view"></main>
+<footer id="log"></footer>
+
+<script src="engine.js"></script>
+<script src="suite.js"></script>
+<script src="about.js"></script>
+<script>
+(function () {
+  'use strict';
+  var MODE = 'sim', hub = null, WAKE_READY = false;
+  var state = { tab: 'about', about: {}, token: 'tok_priya_adops', replay: null, segId: null, sync: null, syncSeg: 'seg_glowroot_festive_east', dstate: null, radius: null, scen: {}, builder: '', tests: null, explorer: null, logOpen: false, logSel: null };
+  var LOG = [];
+
+  // ---------------------------------------------------------------- helpers
+  function h(tag, attrs) {
+    var e = document.createElement(tag), kids = Array.prototype.slice.call(arguments, 2);
+    Object.keys(attrs || {}).forEach(function (k) {
+      var v = attrs[k];
+      if (k === 'class') e.className = v;
+      else if (k === 'style') e.style.cssText = v;
+      else if (k === 'value') e.value = v;
+      else if (k.slice(0, 2) === 'on') e.addEventListener(k.slice(2), v);
+      else if (v !== false && v != null) e.setAttribute(k, v === true ? '' : v);
+    });
+    (function add(list) { list.forEach(function (c) { if (Array.isArray(c)) return add(c); if (c == null || c === false) return; e.append(c.nodeType ? c : document.createTextNode(String(c))); }); })(kids);
+    return e;
+  }
+  function chip(text, tone) { return h('span', { class: 'chip ' + (tone || 'grey') }, text); }
+  function pre(obj) { return h('pre', {}, typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2)); }
+  function fmtSecs(s) {
+    if (s == null) return 'n/a';
+    if (s <= 0) return 'expired';
+    var hh = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), ss = s % 60;
+    return hh ? hh + 'h ' + mm + 'm' : mm ? mm + 'm ' + (ss < 10 ? '0' : '') + ss + 's' : ss + 's';
+  }
+  function uid() { return 'ui-' + Math.random().toString(36).slice(2, 10); }
+  function toast(msg, tone) {
+    var t = h('div', { class: 'toast ' + (tone === 'bad' ? 'bad' : tone === 'good' ? 'good' : 'info') }, msg);
+    document.body.append(t); setTimeout(function () { t.remove(); }, tone === 'bad' ? 7000 : 3800);
+  }
+  function actorLabel(tok) { var t = (state.dstate ? state.dstate.tokens : []).filter(function (x) { return x.token === tok; })[0]; return t ? t.label : tok; }
+  function errText(r) { var b = r.body || {}; return r.status + ' ' + (b.error || '') + (b.message ? ': ' + b.message : ''); }
+
+  // ---------------------------------------------------------------- api
+  async function api(method, path, opts) {
+    opts = opts || {};
+    var token = opts.token === undefined ? state.token : opts.token;
+    var headers = Object.assign({}, token ? { authorization: 'Bearer ' + token } : {}, opts.headers || {});
+    var t0 = performance.now(), res;
+    var qs = opts.query && Object.keys(opts.query).length ? '?' + new URLSearchParams(opts.query).toString() : '';
+    if (MODE === 'live') {
+      var init = { method: method, headers: Object.assign({ 'content-type': 'application/json' }, headers) };
+      if (opts.body !== undefined) init.body = JSON.stringify(opts.body);
+      var r = await fetch(path + qs, init), text = await r.text(), body = null;
+      try { body = text ? JSON.parse(text) : null; } catch (e) { body = text; }
+      var hd = {}; r.headers.forEach(function (v, k) { hd[k] = v; });
+      res = { status: r.status, headers: hd, body: body, redirected: r.redirected, url: r.url };
+    } else {
+      var out = hub.handle({ method: method, path: path, query: opts.query || {}, headers: headers, body: opts.body === undefined ? undefined : JSON.parse(JSON.stringify(opts.body)) });
+      res = { status: out.status, headers: out.headers || {}, body: out.body === undefined ? null : JSON.parse(JSON.stringify(out.body)) };
+    }
+    res.ms = Math.max(1, Math.round(performance.now() - t0));
+    LOG.unshift({ method: method, path: path + qs, who: token ? actorLabel(token) : 'no token (demo control)', reqBody: opts.body, res: res, at: new Date() });
+    if (LOG.length > 40) LOG.length = 40;
+    renderLog();
+    return res;
+  }
+  async function detect() {
+    if (!/^https?:$/.test(location.protocol)) { MODE = 'sim'; hub = SegmentHub.createHub({ seed: true }); return; }
+    try {
+      var ctl = new AbortController(); setTimeout(function () { ctl.abort(); }, 1500);
+      var r = await fetch('/v1/health', { signal: ctl.signal }), j = await r.json();
+      if (j && j.service === 'segment-hub') { MODE = 'live'; return; }
+    } catch (e) { /* fall through */ }
+    MODE = 'sim'; hub = SegmentHub.createHub({ seed: true });
+    // A free-tier server can take 30 to 60 s to wake. Start in simulation right away, keep checking, and offer a switch when it answers.
+    var tries = 0, timer = setInterval(async function () {
+      tries++; if (tries > 40) { clearInterval(timer); return; }
+      try {
+        var c2 = new AbortController(); setTimeout(function () { c2.abort(); }, 4000);
+        var r2 = await fetch('/v1/health', { signal: c2.signal }), j2 = await r2.json();
+        if (j2 && j2.service === 'segment-hub') { clearInterval(timer); WAKE_READY = true; renderChrome(); }
+      } catch (e) { /* still asleep */ }
+    }, 5000);
+  }
+  async function refreshDemo() { var r = await api('GET', '/v1/demo/state', { token: null }); state.dstate = r.body; renderChrome(); }
+
+  // ---------------------------------------------------------------- chrome
+  var TABS = [['about', 'About this project'], ['story', '1. Story scenarios'], ['segments', '2. Segments and publish'], ['sync', '3. Sync board'], ['api', '4. API explorer'], ['tests', '5. Tests']];
+  function renderChrome() {
+    var m = document.getElementById('mode');
+    m.textContent = MODE === 'live' ? 'Live API: this page is calling the server' : (WAKE_READY ? 'The live server is awake. Click here to switch (resets this page)' : 'Browser simulation: same engine, no server');
+    m.className = 'chip ' + (MODE === 'live' ? 'good' : 'warn');
+    m.style.cursor = WAKE_READY && MODE !== 'live' ? 'pointer' : ''; m.onclick = WAKE_READY && MODE !== 'live' ? function () { location.reload(); } : null;
+    var sel = document.getElementById('actor'); sel.innerHTML = '';
+    (state.dstate ? state.dstate.tokens : []).filter(function (t) { return t.role !== 'consumer'; }).forEach(function (t) {
+      sel.append(h('option', { value: t.token, selected: t.token === state.token }, t.label));
+    });
+    document.getElementById('clock').textContent = state.dstate ? 'Hub clock ' + state.dstate.now.slice(11, 19) + ' UTC, catalog rev ' + state.dstate.catalog_rev : '';
+    var nav = document.getElementById('tabs'); nav.innerHTML = '';
+    TABS.forEach(function (t) { nav.append(h('button', { class: state.tab === t[0] ? 'on' : '', onclick: async function () { state.tab = t[0]; if (t[0] === 'sync') await loadSync(); renderChrome(); render(); } }, t[1])); });
+  }
+  function renderLog() {
+    document.body.classList.toggle('logopen', !!state.logOpen);
+    var f = document.getElementById('log'); f.innerHTML = '';
+    f.append(h('div', { class: 'row' }, h('b', {}, 'Raw API calls'), h('span', { class: 'muted' }, LOG.length + ' this session. Every button above is one or more of these.'),
+      h('button', { class: 'sm', onclick: function () { state.logOpen = !state.logOpen; renderLog(); } }, state.logOpen ? 'Hide' : 'Show')));
+    if (!state.logOpen) return;
+    var box = h('div', { class: 'calls' });
+    LOG.slice(0, 12).forEach(function (c, i) {
+      var tone = c.res.status < 300 ? 'good' : c.res.status < 400 ? 'info' : 'bad';
+      box.append(h('div', { class: 'call', onclick: function () { state.logSel = state.logSel === i ? null : i; renderLog(); } }, chip(c.res.status, tone), h('span', { class: 'mono' }, c.method + ' ' + c.path), h('span', { class: 'muted' }, c.who + ', ' + c.res.ms + ' ms')));
+      if (state.logSel === i) box.append(h('div', { class: 'two' }, h('div', {}, h('div', { class: 'muted' }, 'Request body'), pre(c.reqBody === undefined ? '(none)' : c.reqBody)), h('div', {}, h('div', { class: 'muted' }, 'Response body'), pre(c.res.body === null ? '(empty)' : c.res.body))));
+    });
+    f.append(box);
+  }
+
+  // ---------------------------------------------------------------- story
+  function bid(mut) {
+    var r = { id: 'req-1', device: { devicetype: 4, os: 'android', geo: { country: 'IND', region: 'IN-WB' } }, site: { domain: 'beauty-blog.example', cat: ['IAB18-1'], cattax: 1 },
+      user: { data: [{ id: 'partner_a', segment: [{ id: 'purchase_skincare_30d' }] }] }, regs: { gpp: 'demo-gpp-granted' } };
+    if (mut) mut(r); return r;
+  }
+  function find(list, id) { return (list || []).filter(function (x) { return x.segment_id === id; })[0]; }
+  var SCEN = [
+    { n: 1, title: 'Consented purchaser on a beauty blog', shows: 'Hard rules pass, then the soft rules pick tier 1', seg: 'seg_glowroot_festive_east', query: {},
+      body: bid(function (r) { r.id = 'req-s1'; }),
+      facts: ['Kolkata (IN-WB)', 'mobile', 'consent granted', 'bought skincare in 30 days', 'beauty blog'],
+      verdict: function (b) { var m = find(b.matches, 'seg_glowroot_festive_east'); return m ? { tone: 'good', head: 'MATCH, tier 1', text: m.reason } : { tone: 'bad', head: 'No match', text: 'Unexpected. Reset the demo and run again.' }; } },
+    { n: 2, title: 'Same user, no consent', shows: 'Consent fallback: context only, tier 2', seg: 'seg_glowroot_festive_east', query: {},
+      body: bid(function (r) { r.id = 'req-s2'; delete r.regs; }),
+      facts: ['Kolkata (IN-WB)', 'mobile', 'no consent string', 'beauty blog'],
+      verdict: function (b) { var m = find(b.matches, 'seg_glowroot_festive_east'); return m ? { tone: 'warn', head: 'MATCH, tier 2 (context only)', text: 'Without consent the audience signal is ignored, so the request still qualifies on page context but at lower priority. ' + m.reason } : { tone: 'bad', head: 'No match', text: 'Unexpected.' }; } },
+    { n: 3, title: 'Consented purchaser on a made-for-advertising site', shows: 'Exclusion list overrides everything', seg: 'seg_glowroot_festive_east', query: {},
+      body: bid(function (r) { r.id = 'req-s3'; r.site.domain = 'cheap-clicks.example'; }),
+      facts: ['Kolkata (IN-WB)', 'mobile', 'consent granted', 'site cheap-clicks.example (on excl_mfa)'],
+      verdict: function (b) { var e = find(b.excluded, 'seg_glowroot_festive_east'); return e ? { tone: 'bad', head: 'EXCLUDED', text: e.reason } : { tone: 'bad', head: 'Unexpected', text: 'The site should have been excluded.' }; } },
+    { n: 4, title: 'Mumbai edge cluster still on an older rule (narrower copy)', shows: 'Stale copy that under-delivers. No pause: alert and refresh', seg: 'seg_glowroot_festive_east', query: { catalog_rev: 4, compare: 'active' },
+      body: bid(function (r) { r.id = 'req-s4'; r.device.geo.region = 'IN-OD'; }),
+      facts: ['Bhubaneswar (IN-OD)', 'mobile', 'consent granted', 'replayed against catalog rev 4, what the Mumbai cluster holds'],
+      verdict: function (b) {
+        var d = b.compare && find(b.compare.differences, 'seg_glowroot_festive_east');
+        return d ? { tone: 'warn', head: 'DIVERGES: the stale copy rejects what the active version accepts', text: 'The Mumbai cluster holds segment v2 (West Bengal only). The active v3 adds Odisha, so this request is ' + d.held + ' on the stale copy and ' + d.active + ' on the active one. The stale copy is narrower: it under-delivers but does not leak. Policy: never pause it. Raise a P2 alert and force a refresh.' } : { tone: 'bad', head: 'No divergence', text: 'Unexpected. Reset the demo.' };
+      }, link: ['sync', 'seg_glowroot_festive_east', 'See it on the sync board'] },
+    { n: 5, title: 'Singapore edge cluster missed an exclusion-list update (wider copy)', shows: 'Stale copy that leaks. High risk: pause request, countdown, kill switch', seg: 'seg_glowroot_premium_north', query: { catalog_rev: 3, compare: 'active' },
+      body: bid(function (r) { r.id = 'req-s5'; r.device.geo.region = 'IN-DL'; r.site.domain = 'glow-deals-feed.example'; }),
+      facts: ['Delhi (IN-DL)', 'mobile', 'consent granted', 'site glow-deals-feed.example, added to excl_mfa in rev 4', 'replayed against catalog rev 3, what the Singapore cluster holds'],
+      verdict: function (b) {
+        var d = b.compare && find(b.compare.differences, 'seg_glowroot_premium_north');
+        return d ? { tone: 'bad', head: 'DIVERGES: the stale copy serves what the active version excludes', text: 'The Singapore cluster is on catalog rev 3, before the site was added to the MFA list. It would be ' + d.held + ' while the active catalog says ' + d.active + '. That is a wider stale copy: a leak and a brand-safety risk. Policy: request a pause. If the cluster cannot be reached, use the kill switch, then the segment\'s local expiry (15 minutes, because this segment is strict).' } : { tone: 'bad', head: 'No divergence', text: 'Unexpected. Reset the demo.' };
+      }, link: ['sync', 'seg_glowroot_premium_north', 'See it on the sync board'] }
+  ];
+  async function runScenario(s) {
+    var r = await api('POST', '/v1/match', { token: 'tok_priya_adops', query: s.query, body: s.body });
+    state.scen[s.n] = { res: r }; render();
+  }
+  // ---------------------------------------------------------------- guided replay
+  var REPLAY = [
+    { t: 'The client complains.', d: 'Their ad ran on a site they excluded. Replay that request against the copy the Singapore cluster holds.' },
+    { t: 'The hub sees it.', d: 'Open the sync board for the same segment and read what it says about that cluster.' },
+    { t: 'An approver asks for a pause.', d: 'Only high-risk stale copies are targeted. Narrower copies are skipped on purpose.' },
+    { t: 'The server confirms.', d: 'The cluster pulls the signed snapshot, applies it and acknowledges.' },
+    { t: 'Back in sync.', d: 'Read the board again.' }
+  ];
+  async function replayStep() {
+    var R = state.replay; if (R.busy) return; R.busy = true; render();
+    var seg = 'seg_glowroot_premium_north', sg = function (rows) { return rows.filter(function (x) { return x.consumer_id === 'edge_sg_1'; })[0]; };
+    try {
+      if (R.step === 0) {
+        await api('POST', '/v1/demo/reset', { token: null }); state.scen = {};
+        var r = await api('POST', '/v1/match', { token: 'tok_priya_adops', query: SCEN[4].query, body: SCEN[4].body });
+        var d = r.status === 200 && r.body.compare && find(r.body.compare.differences, seg);
+        R.notes.push(d ? 'The request is "' + d.held + '" on the copy the Singapore cluster holds and "' + d.active + '" on the active one. The client was right.' : 'No divergence found. Press Start again.');
+        if (!d) R.step = -1;
+      } else if (R.step === 1) {
+        state.syncSeg = seg; await loadSync();
+        var c = sg(state.sync.sync.consumers), sm = state.sync.sync.summary;
+        R.notes.push(c.name + ' is ' + c.state.replace('_', ' ') + ': ' + (CLS[c.classification] || [c.classification])[0] + '. About ' + fmtSecs(c.seconds_until_local_expiry) + ' until local expiry. Recommended action: ' + (ACT[c.recommended_action] || c.recommended_action) + '. High-risk stale exposure so far: ' + sm.high_risk_stale_exposure_traffic_minutes + ' traffic-minutes.');
+      } else if (R.step === 2) {
+        var p = await api('POST', '/v1/segments/' + seg + '/transitions', { token: 'tok_rahul_approver', body: { action: 'pause', reason: 'Replay: wider stale copy on the Singapore cluster' }, headers: { 'idempotency-key': uid() } });
+        R.notes.push(p.status === 202 ? 'Rahul requests a pause for ' + p.body.pending.join(', ') + (p.body.skipped && p.body.skipped.length ? ' and skips ' + p.body.skipped.map(function (x) { return x.consumer_id; }).join(', ') + ' (under-delivery only)' : '') + '.' : 'The pause answered ' + p.status + ': ' + errText(p));
+      } else if (R.step === 3) {
+        var sy = await api('POST', '/v1/demo/consumers/edge_sg_1/sync', { token: null, body: {} });
+        R.notes.push(sy.status < 300 ? 'Singapore: ' + sy.body.result + '. It also confirms the pause.' : errText(sy));
+      } else if (R.step === 4) {
+        await loadSync();
+        var c2 = sg(state.sync.sync.consumers), sm2 = state.sync.sync.summary;
+        R.notes.push(c2.name + ' is ' + c2.state.replace('_', ' ') + ', pause ' + c2.pause + '. High-risk stale exposure is now ' + sm2.high_risk_stale_exposure_traffic_minutes + '. The incident closed in the time it took to read five steps.');
+      }
+      if (R.step >= 0) R.step++; else { R.step = 0; R.notes = []; }
+      await refreshDemo();
+    } finally { R.busy = false; }
+    render();
+  }
+  function renderReplay(v) {
+    var R = state.replay || (state.replay = { step: 0, notes: [], busy: false });
+    var card = h('div', { class: 'card' }, h('div', { class: 'row' }, h('b', {}, 'Replay the incident in five steps'), h('span', { class: 'muted small' }, 'Each step makes real calls. Starting resets the demo to its seeded story.')));
+    var ol = h('ol', { style: 'margin:8px 0;padding-left:22px' });
+    REPLAY.forEach(function (st, i) {
+      ol.append(h('li', { style: 'margin:8px 0;' + (i > R.step ? 'opacity:.55' : '') }, h('b', {}, st.t), ' ', h('span', { class: 'muted' }, st.d),
+        i < R.step ? h('div', { class: 'verdict info', style: 'font-weight:500;margin:4px 0' }, R.notes[i]) : null,
+        i === R.step ? h('div', { style: 'margin-top:4px' }, h('button', { class: 'pri sm', disabled: R.busy, onclick: replayStep }, i === 0 ? 'Start' : 'Next step')) : null));
+    });
+    card.append(ol);
+    if (R.step >= REPLAY.length) card.append(h('div', { class: 'row' },
+      h('button', { class: 'sm', onclick: function () { state.tab = 'sync'; renderChrome(); render(); window.scrollTo(0, 0); } }, 'Open the sync board >'),
+      h('button', { class: 'sm', onclick: function () { state.replay = null; render(); } }, 'Start again')));
+    v.append(card);
+  }
+  function renderStory(v) {
+    v.append(h('h2', {}, 'The GlowRoot story in five requests'),
+      h('p', { class: 'lead' }, 'A fictional D2C skincare brand targets festive shoppers in East India. Each button sends a real bid-request-style call to POST /v1/match and explains the answer.'));
+    v.append(h('div', { class: 'card' },
+      h('b', {}, 'What this is, in one line. '), 'One internal API where AdOps defines who an ad may reach, tests and publishes it with a second pair of eyes, and sees whether every ad server actually runs the active version.',
+      h('details', {}, h('summary', {}, 'What is real here and what is simulated'),
+        h('ul', { class: 'small' },
+          h('li', {}, 'Real: the rule engine, validation, versions, fingerprints, blast-radius diff, four-eyes, snapshots with ETag and delta, acks with three states, stale-copy policy, local expiry, idempotency. All 79 tests run on this same code.'),
+          h('li', {}, 'Simulated: tokens are fixed demo tokens, snapshot signatures are a demo hash, consent strings are not decoded (a string containing "denied" counts as no consent), consumers and their traffic shares are made up, state is in memory.'),
+          h('li', {}, 'Not claimed: that Media.net\'s real systems work this way. See the document for assumptions.')))));
+    renderReplay(v);
+    SCEN.forEach(function (s) {
+      var out = state.scen[s.n], card = h('div', { class: 'card' });
+      card.append(h('div', { class: 'row' }, chip('Request ' + s.n, 'info'), h('b', {}, s.title), h('span', { class: 'muted small' }, s.shows)));
+      card.append(h('div', { class: 'row', style: 'margin:8px 0' }, s.facts.map(function (f) { return chip(f, 'grey'); })));
+      card.append(h('button', { class: 'pri sm', onclick: function () { runScenario(s); } }, out ? 'Run again' : 'Send request'));
+      if (out) {
+        var b = out.res.body, vd = out.res.status === 200 ? s.verdict(b) : { tone: 'bad', head: 'Error ' + out.res.status, text: errText(out.res) };
+        card.append(h('div', { class: 'verdict ' + vd.tone }, vd.head), h('div', {}, vd.text));
+        if (b && b.compare) {
+          var sg = s.seg;
+          function lines(list, matches) { var m = find(matches, sg), x = find(list.excluded, sg); return m ? 'match, tier ' + m.tier : x ? 'no match: ' + x.reason : 'no match'; }
+          card.append(h('div', { class: 'two', style: 'margin-top:8px' },
+            h('div', { class: 'tile' }, h('span', {}, 'What the consumer holds (catalog rev ' + b.compare.held_rev + ')'), h('div', {}, lines(b, b.matches))),
+            h('div', { class: 'tile' }, h('span', {}, 'What is active now (catalog rev ' + b.compare.active_rev + ')'), h('div', {}, lines(b.compare.active, b.compare.active.matches)))));
+        }
+        if (s.link) card.append(h('div', { style: 'margin-top:8px' }, h('button', { class: 'sm', onclick: async function () { state.syncSeg = s.link[1]; await loadSync(); state.tab = 'sync'; renderChrome(); render(); window.scrollTo(0, 0); } }, s.link[2] + ' >')));
+        card.append(h('details', {}, h('summary', {}, 'Raw request and response'), h('div', { class: 'muted small' }, 'POST /v1/match' + (Object.keys(s.query).length ? '?' + new URLSearchParams(s.query) : '')), pre(s.body), pre(b)));
+      }
+      v.append(card);
+    });
+  }
+
+  // ---------------------------------------------------------------- segments
+  function pill(status) { return chip(status, { active: 'good', approved: 'info', submitted: 'info', draft: 'grey', superseded: 'warn' }[status] || 'grey'); }
+  async function loadSegments() {
+    var r = await api('GET', '/v1/segments');
+    state.list = r.status === 200 ? r.body.items : [];
+    if (!state.segId && state.list.length) state.segId = state.list[0].segment_id;
+    if (state.segId) { var d = await api('GET', '/v1/segments/' + state.segId); state.seg = d.status === 200 ? d.body : null; if (d.status !== 200) state.segErr = errText(d); else state.segErr = null; }
+  }
+  async function transit(action, version, extra) {
+    var body = Object.assign({ action: action, version: version }, extra || {});
+    var r = await api('POST', '/v1/segments/' + state.segId + '/transitions', { body: body, headers: { 'idempotency-key': uid() } });
+    if (r.status < 300) { toast(action + ' ok', 'good'); if (action === 'submit') state.radius = { version: version, br: r.body.blast_radius }; }
+    else toast(errText(r) + (r.body && r.body.error === 'forbidden' ? '. Switch "Acting as" at the top.' : ''), 'bad');
+    await refreshDemo(); await loadSegments(); render();
+    return r;
+  }
+  async function fullFlow(version) {
+    var steps = [['tok_priya_adops', 'submit'], ['tok_rahul_approver', 'approve'], ['tok_rahul_approver', 'publish']];
+    for (var i = 0; i < steps.length; i++) {
+      var r = await api('POST', '/v1/segments/' + state.segId + '/transitions', { token: steps[i][0], body: { action: steps[i][1], version: version, reason: 'Guided demo flow' }, headers: { 'idempotency-key': uid() } });
+      if (steps[i][1] === 'submit' && r.status === 200) state.radius = { version: version, br: r.body.blast_radius };
+      if (r.status >= 300) { toast(steps[i][1] + ': ' + errText(r), 'bad'); break; }
+    }
+    toast('Submitted by Priya, approved and published by Rahul', 'good');
+    await refreshDemo(); await loadSegments(); render();
+  }
+  function fmtIN(n) { var x = String(Math.round(Math.abs(n))); return x.length <= 3 ? x : x.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ',' + x.slice(-3); }
+  function reachLine(r) { return r.delta_per_day === 0 ? fmtIN(r.before_per_day) + ' impressions a day, unchanged' : fmtIN(r.before_per_day) + ' to ' + fmtIN(r.after_per_day) + ' impressions a day (' + (r.delta_per_day > 0 ? '+' : '-') + fmtIN(Math.abs(r.delta_per_day)) + (r.delta_pct != null ? ', ' + (r.delta_pct > 0 ? '+' : '') + r.delta_pct + '%' : '') + ')'; }
+  function ruleText(rule) { return JSON.stringify(rule, null, 2); }
+  async function saveRule(asNew, name) {
+    var rule; try { rule = JSON.parse(state.builder); } catch (e) { toast('That is not valid JSON: ' + e.message, 'bad'); return; }
+    var r = asNew
+      ? await api('POST', '/v1/segments', { body: { name: name, advertiser_id: 'adv_glowroot', rule: rule }, headers: { 'idempotency-key': uid() } })
+      : await api('POST', '/v1/segments/' + state.segId + '/versions', { body: { rule: rule }, headers: { 'idempotency-key': uid() } });
+    if (r.status === 201) { toast('Saved as ' + r.body.segment_id + ' v' + r.body.version + (r.body.validation.warnings.length ? '. ' + r.body.validation.warnings.join(' ') : ''), 'good'); if (asNew) state.segId = r.body.segment_id; await loadSegments(); render(); }
+    else { state.builderErr = errText(r) + (r.body && r.body.path ? ' (at ' + r.body.path + ')' : ''); toast(state.builderErr, 'bad'); render(); }
+  }
+  function tweak(fn) {
+    try { var r = JSON.parse(state.builder); fn(r); state.builder = ruleText(r); state.builderErr = null; render(); } catch (e) { toast('Edit the JSON first: ' + e.message, 'bad'); }
+  }
+  function regionCond(r) { return r.must.filter(function (c) { return c.field === 'device.geo.region'; })[0]; }
+  function renderSegments(v) {
+    v.append(h('h2', {}, 'Create, test, approve and publish'), h('p', { class: 'lead' }, 'Versions never change once saved. A version is draft, then submitted (with a blast-radius diff and a reach estimate), approved by a different person, then published. To get a draft, change the rule in the editor below and save it as a new version, then use Run full flow on it.'));
+    var list = h('div', { class: 'row', style: 'margin-bottom:10px' });
+    (state.list || []).forEach(function (s) { list.append(h('button', { class: s.segment_id === state.segId ? 'pri sm' : 'sm', onclick: async function () { state.segId = s.segment_id; state.builder = ''; state.radius = null; await loadSegments(); render(); } }, s.name + ' (v' + s.active_version + ')')); });
+    v.append(list);
+    var s = state.seg;
+    if (!s) { v.append(h('div', { class: 'card' }, state.segErr || 'No segments visible to this actor.')); }
+    else {
+      if (!state.builder) state.builder = ruleText(s.active ? s.active.rule : s.versions[s.versions.length - 1].rule);
+      var tbl = h('table', {}, h('tr', {}, ['Version', 'Status', 'Created by', 'Fingerprint', 'Step'].map(function (x) { return h('th', {}, x); })));
+      s.versions.slice().reverse().forEach(function (ver) {
+        var act = h('span', { class: 'row' });
+        if (ver.status === 'draft') { act.append(h('button', { class: 'sm', onclick: function () { transit('submit', ver.version); } }, 'Submit'), h('button', { class: 'sm pri', onclick: function () { fullFlow(ver.version); } }, 'Run full flow')); }
+        if (ver.status === 'submitted') act.append(h('button', { class: 'sm', onclick: function () { transit('approve', ver.version); } }, 'Approve'));
+        if (ver.status === 'approved') act.append(h('button', { class: 'sm', onclick: function () { transit('publish', ver.version, { reason: 'Approved in the demo' }); } }, 'Publish'));
+        if (ver.status === 'superseded') act.append(h('button', { class: 'sm', onclick: function () { transit('rollback', ver.version, { reason: 'Rolled back in the demo' }); } }, 'Roll back to this'));
+        tbl.append(h('tr', {}, h('td', {}, 'v' + ver.version), h('td', {}, pill(ver.status)), h('td', {}, ver.created_by + (ver.approved_by ? ', approved by ' + ver.approved_by : '')), h('td', { class: 'mono' }, ver.fingerprint), h('td', {}, act)));
+      });
+      v.append(h('div', { class: 'card' }, h('div', { class: 'row' }, h('b', {}, s.name), h('span', { class: 'mono muted small' }, s.segment_id), s.paused ? chip('paused', 'bad') : null),
+        h('div', { class: 'scroll' }, tbl),
+        h('div', { class: 'small muted' }, 'Four-eyes: the person who created a version cannot approve or publish it. Try "Approve" while acting as Priya, then as Rahul. Rollback only works on a version that was live before.')));
+      if (state.radius) {
+        var br = state.radius.br;
+        v.append(h('div', { class: 'card' }, h('div', { class: 'row' }, h('b', {}, 'Blast radius of v' + state.radius.version), chip('vs live v' + br.vs_active, 'grey')),
+          h('div', { class: 'grid g4', style: 'margin:8px 0' },
+            h('div', { class: 'tile' }, h('span', {}, 'This change'), h('b', { style: 'font-size:16px' }, br.new_version_change)),
+            h('div', { class: 'tile' }, h('span', {}, 'Publish risk'), h('b', { style: 'font-size:16px' }, br.publish_risk)),
+            h('div', { class: 'tile' }, h('span', {}, 'A server left on the old copy would be'), h('b', { style: 'font-size:16px' }, br.stale_copy_behavior)),
+            h('div', { class: 'tile' }, h('span', {}, 'Stale-copy risk'), h('b', { style: 'font-size:16px' }, br.stale_copy_risk))),
+          br.estimated_reach ? h('div', { class: 'tile', style: 'margin:0 0 8px' }, h('span', {}, 'Estimated reach, simulated sample'), h('b', { style: 'font-size:16px' }, reachLine(br.estimated_reach)), h('span', {}, br.estimated_reach.basis)) : null,
+          h('div', {}, br.plain_language), h('details', {}, h('summary', {}, 'Raw blast_radius'), pre(br))));
+      }
+    }
+    var errBox = state.builderErr ? h('div', { class: 'verdict bad' }, state.builderErr) : null;
+    var nameIn = h('input', { type: 'text', id: 'newname', value: 'GlowRoot Diwali Gifting', style: 'min-width:220px' });
+    v.append(h('div', { class: 'card' }, h('b', {}, 'Rule editor'), h('div', { class: 'muted small' }, 'Edit the JSON, then save it as a new version of the selected segment or as a new segment. Bad rules are refused with a specific error.'),
+      h('div', { class: 'row', style: 'margin:8px 0' },
+        h('button', { class: 'sm', onclick: function () { tweak(function (r) { var c = regionCond(r); if (c && c.in.indexOf('IN-KA') < 0) c.in.push('IN-KA'); }); } }, '+ add Karnataka (widens)'),
+        h('button', { class: 'sm', onclick: function () { tweak(function (r) { var c = regionCond(r); if (c) c.in = c.in.filter(function (x) { return x !== 'IN-OD'; }); if (c && !c.in.length) throw new Error('no regions left'); }); } }, '- remove Odisha (tightens)'),
+        h('button', { class: 'sm', onclick: function () { tweak(function (r) { r.audience_required = true; }); } }, 'require audience'),
+        h('button', { class: 'sm', onclick: function () { tweak(function (r) { r.must[0].field = 'device.geo.state'; }); } }, 'break it on purpose')),
+      h('textarea', { rows: 16, spellcheck: 'false', oninput: function (e) { state.builder = e.target.value; } }, state.builder), errBox,
+      h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'pri sm', onclick: function () { saveRule(false); } }, 'Save as new version of selected segment'), nameIn, h('button', { class: 'sm', onclick: function () { saveRule(true, nameIn.value); } }, 'Create as new segment'))));
+  }
+
+  // ---------------------------------------------------------------- sync board
+  var CLS = { narrower_subset: ['narrower copy, low risk', 'warn'], wider_superset: ['wider copy, HIGH risk', 'bad'], mixed: ['mixed change, treated as wider, HIGH risk', 'bad'], unclassified: ['unclassified, treated as wider', 'bad'], missing_in_held: ['segment not held, low risk', 'warn'], tier_only: ['tiers only, low risk', 'grey'], same: ['same as active', 'good'] };
+  var ACT = { none: 'Nothing to do', alert_p2_and_refresh: 'P2 alert, force a refresh. Never pause', request_pause: 'Request a pause', kill_switch_then_expiry: 'Unreachable: kill switch, then local expiry', kill_switch_now: 'Consent critical: request a pause and use the kill switch now', probe_and_alert: 'Probe and alert. Local expiry applies if silent', pause_requested: 'Pause requested, waiting for confirmation', pause_confirmed: 'Pause confirmed' };
+  async function loadSync() {
+    var r = await api('GET', '/v1/segments/' + state.syncSeg, { query: { include: 'sync' } });
+    state.sync = r.status === 200 ? r.body : null; state.syncErr = r.status === 200 ? null : errText(r); state.syncAt = Date.now();
+  }
+  async function demoCall(path, body, label) {
+    var r = await api('POST', path, { token: null, body: body || {} });
+    toast(label ? label(r) : (r.status < 300 ? 'ok' : errText(r)), r.status < 300 ? 'good' : 'bad');
+    await refreshDemo(); await loadSync(); render();
+  }
+  function renderSync(v) {
+    v.append(h('h2', {}, 'Sync board: is every ad server running the active rule?'),
+      h('p', { class: 'lead' }, 'Servers pull a signed snapshot and ack the revision they run. Only an "active" ack counts as in sync. The board compares each server\'s copy with the active one and decides how urgent it is.'));
+    var segSel = h('select', { onchange: async function (e) { state.syncSeg = e.target.value; await loadSync(); render(); } },
+      (state.dstate ? state.dstate.segments : []).map(function (s) { return h('option', { value: s.segment_id, selected: s.segment_id === state.syncSeg }, s.name); }));
+    var site = h('input', { type: 'text', value: 'new-spam.example', style: 'width:200px' });
+    v.append(h('div', { class: 'card' }, h('div', { class: 'row' }, h('b', {}, 'Segment'), segSel,
+      h('span', { class: 'muted small' }, 'Move the clock:'),
+      [[900, '+15 min'], [3600, '+1 hour'], [14400, '+4 hours']].map(function (x) { return h('button', { class: 'sm', onclick: function () { demoCall('/v1/demo/advance', { seconds: x[0] }, function () { return 'Clock moved ' + x[1]; }); } }, x[1]); })),
+      h('div', { class: 'row', style: 'margin-top:8px' }, h('span', { class: 'muted small' }, 'Exclusion-list owner adds a site (one approval for the list, no new segment versions):'), site,
+        h('button', { class: 'sm', onclick: function () { demoCall('/v1/demo/lists/excl_mfa/domains', { domain: site.value }, function (r) { return r.status < 300 ? 'excl_mfa v' + r.body.version + ' published, catalog rev ' + r.body.catalog_rev + '. Servers on older revisions are now stale.' : errText(r); }); } }, 'Add to excl_mfa'))));
+    var s = state.sync;
+    if (!s) { v.append(h('div', { class: 'card' }, state.syncErr || 'Loading')); return; }
+    var sum = s.sync.summary;
+    v.append(h('div', { class: 'grid g4' },
+      h('div', { class: 'tile' }, h('b', {}, sum.stale_version_impression_share_pct + '%'), h('span', {}, 'Traffic on servers that are behind, right now (simulated shares)')),
+      h('div', { class: 'tile' }, h('b', {}, sum.high_risk_stale_share_pct + '%'), h('span', {}, 'of traffic on a high-risk stale copy')),
+      h('div', { class: 'tile' }, h('b', {}, String(sum.high_risk_stale_exposure_traffic_minutes)), h('span', {}, 'High-risk stale exposure: traffic share times minutes behind. Measured from acks alone, so it works from day one')),
+      h('div', { class: 'tile' }, h('b', {}, sum.ack_coverage_pct + '%'), h('span', {}, 'Ack coverage. ' + sum.unknown_share_pct + '% of traffic is on servers we cannot confirm, so read the numbers beside it with this'))));
+    var tbl = h('table', {}, h('tr', {}, ['Consumer', 'State', 'Holds', 'Versus active', 'Local expiry', 'Policy', ''].map(function (x) { return h('th', {}, x); })));
+    s.sync.consumers.forEach(function (c) {
+      var st = c.state === 'in_sync' ? chip('in sync', 'good') : c.state === 'confirmed_stale' ? chip('confirmed stale', c.risk === 'high' ? 'bad' : 'warn') : chip('unknown', 'grey');
+      var cl = c.classification ? CLS[c.classification] || [c.classification, 'grey'] : null;
+      var act = ACT[c.recommended_action] || c.recommended_action;
+      var exp = c.seconds_until_local_expiry == null ? h('span', { class: 'muted' }, c.state === 'in_sync' ? 'n/a' : 'n/a') : h('span', { class: 'mono', 'data-secs': c.seconds_until_local_expiry }, fmtSecs(c.seconds_until_local_expiry));
+      var outcome = c.local_expiry_outcome ? chip({ fail_closed: 'fails closed', degrade_to_context_only: 'degrades to context only', keep_serving_with_alert: 'keeps serving, alerting' }[c.local_expiry_outcome], c.local_expiry_outcome === 'fail_closed' ? 'bad' : 'warn') : null;
+      tbl.append(h('tr', {},
+        h('td', {}, h('b', {}, c.name), h('div', { class: 'muted small mono' }, c.consumer_id + ', ' + Math.round(c.traffic_share * 100) + '% of traffic'), c.unreachable ? chip('not answering probes', 'bad') : null),
+        h('td', {}, st), h('td', {}, c.held_rev == null ? 'nothing acked' : 'rev ' + c.held_rev + (c.held_version ? ', segment v' + c.held_version : '')),
+        h('td', {}, cl ? chip(cl[0], cl[1]) : '-', c.summary ? h('div', { class: 'muted small' }, c.summary) : (c.note ? h('div', { class: 'muted small' }, c.note) : null)),
+        h('td', {}, exp, c.expiry_class !== undefined && c.seconds_until_local_expiry != null ? h('div', { class: 'muted small' }, c.expiry_class + ' class') : null, outcome),
+        h('td', {}, act, c.pause && c.pause !== 'none' ? h('div', {}, chip('pause ' + c.pause, c.pause === 'confirmed' ? 'good' : 'warn')) : null),
+        h('td', {}, h('div', { class: 'row' },
+          h('button', { class: 'sm', onclick: function () { demoCall('/v1/demo/consumers/' + c.consumer_id + '/sync', {}, function (r) { return r.status < 300 ? c.consumer_id + ': ' + r.body.result : errText(r); }); } }, 'Sync now'),
+          h('button', { class: 'sm', onclick: function () { demoCall('/v1/demo/consumers/' + c.consumer_id + '/unreachable', { value: !c.unreachable }, function (r) { return c.consumer_id + (r.body.unreachable ? ' stops answering' : ' answers again'); }); } }, c.unreachable ? 'Make reachable' : 'Make unreachable')))));
+    });
+    v.append(h('div', { class: 'card' }, h('div', { class: 'scroll' }, tbl),
+      h('div', { class: 'row', style: 'margin-top:10px' },
+        h('button', { class: 'pri sm', onclick: async function () {
+          var r = await api('POST', '/v1/segments/' + state.syncSeg + '/transitions', { body: { action: 'pause', reason: 'Stale copies found on the sync board' }, headers: { 'idempotency-key': uid() } });
+          toast(r.status === 202 ? 'Pause requested for ' + r.body.pending.join(', ') + (r.body.unreachable && r.body.unreachable.length ? '. Unreachable: ' + r.body.unreachable.join(', ') + ', so the kill switch is the backstop' : '') : r.status === 200 ? r.body.message : errText(r) + '. Switch "Acting as" to an approver.', r.status < 300 ? 'good' : 'bad');
+          await refreshDemo(); await loadSync(); render(); } }, 'Request pause for risky stale copies'),
+        h('span', { class: 'muted small' }, 'Needs an approver. Narrower copies are skipped on purpose.')),
+      h('details', {}, h('summary', {}, 'Why a wider and a narrower stale copy get different treatment'),
+        h('table', {}, h('tr', {}, ['New version vs old', 'Risk of publishing it', 'A server left on the old copy is', 'Risk of that stale copy', 'Response'].map(function (x) { return h('th', {}, x); })),
+          h('tr', {}, h('td', {}, 'Expands reach'), h('td', {}, 'High: it can leak'), h('td', {}, 'Narrower'), h('td', {}, 'Low: under-delivery'), h('td', {}, 'Alert and refresh, never pause')),
+          h('tr', {}, h('td', {}, 'Tightens'), h('td', {}, 'Lower: it can over-block'), h('td', {}, 'Wider'), h('td', {}, 'High: leak or compliance'), h('td', {}, 'Pause request, kill switch, then local expiry'))))));
+    v.append(h('details', { class: 'card' }, h('summary', {}, 'Catalog revisions'),
+      h('table', {}, h('tr', {}, ['Rev', 'When', 'What changed'].map(function (x) { return h('th', {}, x); })),
+        (state.dstate ? state.dstate.catalog : []).slice().reverse().map(function (e) { return h('tr', {}, h('td', {}, e.rev), h('td', { class: 'mono small' }, e.created_at.slice(11, 19)), h('td', {}, e.reason)); }))));
+  }
+  setInterval(function () {
+    if (state.tab !== 'sync' || !state.syncAt) return;
+    var el = document.querySelectorAll('[data-secs]');
+    el.forEach(function (n) { var base = Number(n.getAttribute('data-secs')); n.textContent = fmtSecs(base - Math.round((Date.now() - state.syncAt) / 1000)); });
+  }, 1000);
+
+  // ---------------------------------------------------------------- api explorer
+  function presets() {
+    var d = state.dstate, last = d ? d.catalog[d.catalog.length - 1] : { rev: 0, hash: '' };
+    var rule = { must: [{ field: 'device.geo.region', in: ['IN-WB', 'IN-OD'] }, { field: 'device.type', in: ['mobile'] }, { field: 'site.domain', not_in_list: 'excl_mfa' }], should: [{ tier: 1, all: [{ field: 'audience.purchase_skincare_30d', eq: true }, { field: 'site.cat', in: ['IAB18-1'] }] }, { tier: 2, all: [{ field: 'site.cat', in: ['IAB18-1'] }] }], if_audience_missing: 'fall_back_to_context' };
+    return [
+      { name: 'POST /v1/segments', method: 'POST', path: '/v1/segments', token: 'tok_priya_adops', body: { name: 'GlowRoot Monsoon Care', advertiser_id: 'adv_glowroot', rule: rule }, note: 'Create a segment. Returns v1 as a draft with a fingerprint and validation warnings.' },
+      { name: 'POST /v1/segments/{id}/versions', method: 'POST', path: '/v1/segments/seg_glowroot_festive_east/versions', token: 'tok_priya_adops', body: { rule: rule }, note: 'Add an immutable version. There is no PUT.' },
+      { name: 'GET /v1/segments/{id}?include=sync', method: 'GET', path: '/v1/segments/seg_glowroot_festive_east?include=sync', token: 'tok_priya_adops', note: 'Active version, history and per-consumer sync state.' },
+      { name: 'GET /v1/catalog/snapshot', method: 'GET', path: '/v1/catalog/snapshot?since_rev=' + Math.max(0, last.rev - 2), token: 'tok_edge_us_1', note: 'Signed delta for machines. Drop since_rev for a cold start (returns a manifest with a signed URL).' },
+      { name: 'POST /v1/segments/{id}/transitions', method: 'POST', path: '/v1/segments/seg_glowroot_festive_east/transitions', token: 'tok_rahul_approver', body: { action: 'pause', reason: 'Stale wider copies found' }, note: 'submit, approve, publish, rollback, pause, resume. Pause is a request until consumers confirm.' },
+      { name: 'POST /v1/match', method: 'POST', path: '/v1/match?catalog_rev=3&compare=active', token: 'tok_priya_adops', body: bid(function (r) { r.device.geo.region = 'IN-DL'; r.site.domain = 'glow-deals-feed.example'; }), note: 'Reference evaluator. Replay against a catalog revision or one segment version.' },
+      { name: 'POST /v1/consumers/{id}/acks', method: 'POST', path: '/v1/consumers/edge_us_1/acks', token: 'tok_edge_us_1', body: { catalog_rev: last.rev, hash: last.hash, state: 'active', exceptions: [] }, note: 'A consumer reports the revision it runs. Identity comes from the token, not the body.' }
+    ];
+  }
+  function allTokens() { return state.dstate ? state.dstate.tokens : []; }
+  function curl(e) {
+    var origin = MODE === 'live' ? location.origin : 'https://YOUR-APP.onrender.com';
+    var s = "curl -i -X " + e.method + " '" + origin + e.path + "' -H 'Authorization: Bearer " + e.token + "'";
+    if (e.body) s += " -H 'Content-Type: application/json' -d '" + JSON.stringify(e.body) + "'";
+    return s;
+  }
+  function renderApi(v) {
+    v.append(h('h2', {}, 'API explorer'), h('p', { class: 'lead' }, 'The seven endpoints, in six groups. Pick one, edit it, send it. Demo tokens are listed so you can try other roles and see what each one is allowed to do.'));
+    var P = presets();
+    if (!state.explorer) state.explorer = JSON.parse(JSON.stringify(P[2]));
+    var e = state.explorer;
+    var bar = h('div', { class: 'row', style: 'margin-bottom:10px' }, P.map(function (p) { return h('button', { class: 'sm' + (p.name === e.name ? ' pri' : ''), onclick: function () { state.explorer = JSON.parse(JSON.stringify(p)); state.exRes = null; render(); } }, p.name); }));
+    v.append(bar);
+    var mIn = h('select', { onchange: function (x) { e.method = x.target.value; } }, ['GET', 'POST'].map(function (m) { return h('option', { value: m, selected: m === e.method }, m); }));
+    var pIn = h('input', { type: 'text', value: e.path, style: 'flex:1;min-width:260px', oninput: function (x) { e.path = x.target.value; } });
+    var tIn = h('select', { onchange: function (x) { e.token = x.target.value; } }, allTokens().map(function (t) { return h('option', { value: t.token, selected: t.token === e.token }, t.label); }));
+    var bIn = h('textarea', { rows: 12, spellcheck: 'false', oninput: function (x) { e.bodyText = x.target.value; } }, e.bodyText !== undefined ? e.bodyText : (e.body ? JSON.stringify(e.body, null, 2) : ''));
+    v.append(h('div', { class: 'card' }, h('div', { class: 'muted small' }, e.note || ''),
+      h('div', { class: 'row', style: 'margin:8px 0' }, mIn, pIn, tIn, h('button', { class: 'pri sm', onclick: send }, 'Send')),
+      h('div', { class: 'muted small' }, 'Request body'), bIn,
+      h('details', {}, h('summary', {}, 'As curl'), pre(curl(e)))));
+    if (state.exRes) {
+      var r = state.exRes;
+      v.append(h('div', { class: 'card' }, h('div', { class: 'row' }, chip(r.status, r.status < 300 ? 'good' : r.status < 400 ? 'info' : 'bad'), h('span', { class: 'muted small' }, r.ms + ' ms'),
+        r.headers.etag ? h('span', { class: 'mono small' }, 'ETag ' + r.headers.etag) : null, r.headers.location ? h('span', { class: 'mono small' }, 'Location ' + r.headers.location) : null,
+        r.redirected ? h('span', { class: 'muted small' }, 'redirect followed to ' + r.url.replace(location.origin, '')) : null, r.headers['idempotent-replay'] ? chip('idempotent replay', 'info') : null),
+        pre(r.body === null ? '(empty body)' : r.body)));
+    }
+    v.append(h('details', { class: 'card' }, h('summary', {}, 'Demo tokens'), h('table', {}, h('tr', {}, ['Token', 'Role'].map(function (x) { return h('th', {}, x); })),
+      allTokens().map(function (t) { return h('tr', {}, h('td', { class: 'mono small' }, t.token), h('td', {}, t.label)); })),
+      h('div', { class: 'small muted' }, 'These are fixed demo tokens for a public prototype. Production would use short-lived service tokens (OAuth2 client credentials) or mutual TLS.')));
+    async function send() {
+      var u; try { u = new URL(e.path, 'http://x'); } catch (er) { toast('Bad path', 'bad'); return; }
+      var query = {}; u.searchParams.forEach(function (val, k) { query[k] = val; });
+      var body; var txt = bIn.value.trim();
+      if (e.method === 'POST' && txt) { try { body = JSON.parse(txt); } catch (er) { toast('Body is not valid JSON: ' + er.message, 'bad'); return; } }
+      state.exRes = await api(e.method, u.pathname, { token: e.token, query: query, body: body, headers: e.method === 'POST' ? { 'idempotency-key': uid() } : {} });
+      await refreshDemo(); render();
+    }
+  }
+
+  // ---------------------------------------------------------------- tests
+  function renderTests(v) {
+    v.append(h('h2', {}, 'Live tests'), h('p', { class: 'lead' }, 'Runs the test suite here, in your browser. Each test builds a fresh in-memory hub, so it never touches the demo data above. The same suite runs with "npm test" on the server.'));
+    var box = h('div', { class: 'card' });
+    box.append(h('button', { class: 'pri', onclick: function () {
+      if (typeof HubSuite === 'undefined') { toast('Test suite not loaded', 'bad'); return; }
+      state.tests = HubSuite.run(SegmentHub, HubSuite.mini); render();
+    } }, state.tests ? 'Run again' : 'Run all tests'));
+    if (state.tests) {
+      var pass = state.tests.filter(function (t) { return t.ok; }).length;
+      box.append(h('div', { class: 'verdict ' + (pass === state.tests.length ? 'good' : 'bad') }, pass + ' of ' + state.tests.length + ' passed'));
+      var groups = {}; state.tests.forEach(function (t) { (groups[t.group] = groups[t.group] || []).push(t); });
+      Object.keys(groups).forEach(function (g) {
+        var items = groups[g], ok = items.filter(function (t) { return t.ok; }).length;
+        box.append(h('h3', {}, g + ' (' + ok + '/' + items.length + ')'));
+        items.forEach(function (t) { box.append(h('div', { class: 'small', style: 'margin:3px 0' }, chip(t.ok ? 'pass' : 'FAIL', t.ok ? 'good' : 'bad'), ' ', t.name, t.ok ? null : h('div', { class: 'mono', style: 'color:var(--bad)' }, t.error))); });
+      });
+    }
+    box.append(h('p', { class: 'small muted', style: 'margin-top:12px' }, 'These tests prove the logic is internally consistent. They do not prove it matches how Media.net\'s real systems behave.'));
+    v.append(box);
+  }
+
+  // ---------------------------------------------------------------- about
+  function renderAbout(v) {
+    var host = h('div', { id: 'about-host' }, h('p', { class: 'muted' }, 'Loading...'));
+    v.append(host);
+    if (typeof SegmentAbout === 'undefined') { host.textContent = 'The About page script did not load.'; return; }
+    var opts = { avatar: window.ABOUT_AVATAR || 'assets/sid-avatar.svg', persist: state.about,
+      go: function (tab) { state.tab = tab; renderChrome(); render(); window.scrollTo(0, 0); } };
+    if (window.ABOUT_MD) { opts.md = window.ABOUT_MD; SegmentAbout.mount(host, opts); return; }
+    fetch('about.md').then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(function (md) { opts.md = md; if (state.tab === 'about') SegmentAbout.mount(host, opts); })
+      .catch(function () { host.textContent = 'Could not load about.md.'; });
+  }
+
+  // ---------------------------------------------------------------- main
+  function render() {
+    var v = document.getElementById('view'); v.innerHTML = '';
+    ({ about: renderAbout, story: renderStory, segments: renderSegments, sync: renderSync, api: renderApi, tests: renderTests })[state.tab](v);
+  }
+  document.getElementById('actor').addEventListener('change', async function (e) { state.token = e.target.value; await loadSegments(); await loadSync(); render(); });
+  document.getElementById('reset').addEventListener('click', async function () {
+    await api('POST', '/v1/demo/reset', { token: null });
+    state.scen = {}; state.replay = null; state.radius = null; state.builder = ''; state.segId = null; state.exRes = null; state.builderErr = null;
+    await refreshDemo(); await loadSegments(); await loadSync(); render(); toast('Demo reset to the seeded GlowRoot story', 'good');
+  });
+  (async function boot() {
+    await detect(); await refreshDemo(); await loadSegments(); await loadSync(); LOG.length = 0; renderChrome(); renderLog(); render();
+  })();
+})();
+</script>
+</body>
+</html>

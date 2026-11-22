@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: segment-hub
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /v1/health
