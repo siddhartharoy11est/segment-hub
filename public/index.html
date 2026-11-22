@@ -55,7 +55,17 @@ footer .call{cursor:pointer;display:flex;gap:8px;align-items:center;flex-wrap:wr
 .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 body.logopen main{padding-bottom:56vh}
-@media(max-width:640px){.two{grid-template-columns:1fr}header{padding:12px}main{padding:14px 12px 90px}}
+.exwrap{display:grid;grid-template-columns:minmax(230px,300px) 1fr;gap:12px;margin-bottom:12px;align-items:start}
+.exlist{display:flex;flex-direction:column;gap:6px}
+.exitem{display:flex;gap:10px;align-items:flex-start;text-align:left;padding:8px 10px}
+.exitem.on{border-color:var(--acc);background:var(--info-bg)}
+.exnum{flex:none;width:22px;height:22px;border-radius:50%;background:var(--code);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:12px}
+.exitem.on .exnum{background:var(--acc);color:var(--acc-ink)}
+.exguide{margin:0}
+.exguide dl{margin:0;display:grid;grid-template-columns:110px 1fr;gap:6px 12px;font-size:13.5px}
+.exguide dt{color:var(--mut);font-weight:600;font-size:12.5px}
+.exguide dd{margin:0}
+@media(max-width:640px){.exwrap{grid-template-columns:1fr}.exguide dl{grid-template-columns:1fr}.exguide dd{margin-bottom:6px}.two{grid-template-columns:1fr}header{padding:12px}main{padding:14px 12px 90px}}
 </style>
 </head>
 <body>
@@ -470,18 +480,78 @@ body.logopen main{padding-bottom:56vh}
   }, 1000);
 
   // ---------------------------------------------------------------- api explorer
+  // Each endpoint carries a short guide (what, who, why, MVP, what to look for) and extra cases that show a refusal or an edge.
   function presets() {
     var d = state.dstate, last = d ? d.catalog[d.catalog.length - 1] : { rev: 0, hash: '' };
     var rule = { must: [{ field: 'device.geo.region', in: ['IN-WB', 'IN-OD'] }, { field: 'device.type', in: ['mobile'] }, { field: 'site.domain', not_in_list: 'excl_mfa' }], should: [{ tier: 1, all: [{ field: 'audience.purchase_skincare_30d', eq: true }, { field: 'site.cat', in: ['IAB18-1'] }] }, { tier: 2, all: [{ field: 'site.cat', in: ['IAB18-1'] }] }], if_audience_missing: 'fall_back_to_context' };
+    var typo = JSON.parse(JSON.stringify(rule)); typo.must[0].field = 'device.geo.regoin';
+    var seg = '/v1/segments/seg_glowroot_festive_east';
     return [
-      { name: 'POST /v1/segments', method: 'POST', path: '/v1/segments', token: 'tok_priya_adops', body: { name: 'GlowRoot Monsoon Care', advertiser_id: 'adv_glowroot', rule: rule }, note: 'Create a segment. Returns v1 as a draft with a fingerprint and validation warnings.' },
-      { name: 'POST /v1/segments/{id}/versions', method: 'POST', path: '/v1/segments/seg_glowroot_festive_east/versions', token: 'tok_priya_adops', body: { rule: rule }, note: 'Add an immutable version. There is no PUT.' },
-      { name: 'GET /v1/segments/{id}?include=sync', method: 'GET', path: '/v1/segments/seg_glowroot_festive_east?include=sync', token: 'tok_priya_adops', note: 'Active version, history and per-consumer sync state.' },
-      { name: 'GET /v1/catalog/snapshot', method: 'GET', path: '/v1/catalog/snapshot?since_rev=' + Math.max(0, last.rev - 2), token: 'tok_edge_us_1', note: 'Signed delta for machines. Drop since_rev for a cold start (returns a manifest with a signed URL).' },
-      { name: 'POST /v1/segments/{id}/transitions', method: 'POST', path: '/v1/segments/seg_glowroot_festive_east/transitions', token: 'tok_rahul_approver', body: { action: 'pause', reason: 'Stale wider copies found' }, note: 'submit, approve, publish, rollback, pause, resume. Pause is a request until consumers confirm.' },
-      { name: 'POST /v1/match', method: 'POST', path: '/v1/match?catalog_rev=3&compare=active', token: 'tok_priya_adops', body: bid(function (r) { r.device.geo.region = 'IN-DL'; r.site.domain = 'glow-deals-feed.example'; }), note: 'Reference evaluator. Replay against a catalog revision or one segment version.' },
-      { name: 'POST /v1/consumers/{id}/acks', method: 'POST', path: '/v1/consumers/edge_us_1/acks', token: 'tok_edge_us_1', body: { catalog_rev: last.rev, hash: last.hash, state: 'active', exceptions: [] }, note: 'A consumer reports the revision it runs. Identity comes from the token, not the body.' }
+      { n: 1, title: 'Create a segment', name: 'POST /v1/segments', method: 'POST', path: '/v1/segments', token: 'tok_priya_adops', body: { name: 'GlowRoot Monsoon Care', advertiser_id: 'adv_glowroot', rule: rule },
+        what: 'Creates a targeting segment as version 1, in draft. The rule is checked before it is saved, and any audience condition gets a consent tag automatically.',
+        who: 'AdOps', pain: 'A', why: 'Most wrong rules start as a typo or a missing condition. Catching them at creation is the cheapest fix there is.',
+        mvp: 'Yes, weeks 1 to 2.',
+        look: 'Status "draft", a fingerprint, and the warning that the audience rule now needs consent. Nothing is live yet. Send it twice and the second call gets 409: a change to an existing segment must be a new version.',
+        alts: [
+          { label: 'A typo in a field name', body: { name: 'GlowRoot Typo Test', advertiser_id: 'adv_glowroot', rule: typo }, look: '400 with "Did you mean device.geo.region?" and the exact path of the mistake. The rule is never saved.' },
+          { label: 'Write for another advertiser', body: { name: 'Not my client', advertiser_id: 'adv_other', rule: rule }, look: '403 forbidden_advertiser. Each team can only write segments for its own advertisers.' }
+        ] },
+      { n: 2, title: 'Add a version', name: 'POST /v1/segments/{id}/versions', method: 'POST', path: seg + '/versions', token: 'tok_priya_adops', body: { rule: rule },
+        what: 'Adds a new version of an existing segment. There is no edit: earlier versions are never overwritten.',
+        who: 'AdOps', pain: 'A', why: 'When every change is a new version, any complaint can be traced to the exact rule that served, and going back is one step.',
+        mvp: 'Yes, weeks 1 to 2.',
+        look: 'A new version number, in draft. The live version (v3) does not change until a second person approves and publishes.',
+        alts: [
+          { label: 'An approver tries to write a rule', token: 'tok_rahul_approver', look: '403. Approvers review rules, they do not write them. Keeping the two roles apart is what makes the second check real.' }
+        ] },
+      { n: 3, title: 'Check a segment and its sync', name: 'GET /v1/segments/{id}?include=sync', method: 'GET', path: seg + '?include=sync', token: 'tok_priya_adops',
+        what: 'Shows the live version and its history, and for each ad server whether it runs the live version, an older one, or has gone quiet.',
+        who: 'AdOps, approvers, reporting', pain: 'B', why: 'Today, "is my change live everywhere?" is a question someone has to chase. Here it is one request.',
+        mvp: 'Yes. Versions in weeks 1 to 2, the sync view in week 4.',
+        look: 'The "sync" list at the bottom. Each server is in sync, stale (narrower or wider than the live rule) or unknown, with a risk level.',
+        alts: [
+          { label: "Another advertiser's writer asks", token: 'tok_other_writer', look: '404, not 403. A team cannot even learn that another advertiser\'s segment exists.' }
+        ] },
+      { n: 4, title: 'Pull the catalog', name: 'GET /v1/catalog/snapshot', method: 'GET', path: '/v1/catalog/snapshot?since_rev=' + Math.max(0, last.rev - 2), token: 'tok_edge_us_1',
+        what: 'The bundle ad servers pull: every live segment and list, signed, carrying only what changed since the revision the server already holds.',
+        who: 'Ad servers and the deal tagger. People cannot call it.', pain: 'B', why: 'Servers pull on their own schedule and never call the hub while bidding. The hub can be down without slowing a single auction.',
+        mvp: 'Yes, week 3.',
+        look: '"full": false and only the segments that changed since that revision. The "hash" is what the server reports back in step 7.',
+        alts: [
+          { label: 'Cold start, nothing held yet', path: '/v1/catalog/snapshot', look: 'Instead of a huge response, a short-lived signed link to the full copy in storage.' },
+          { label: 'AdOps tries to pull it', token: 'tok_priya_adops', look: '403. Only machines read the bundle.' }
+        ] },
+      { n: 5, title: 'Move a segment through approval', name: 'POST /v1/segments/{id}/transitions', method: 'POST', path: seg + '/transitions', token: 'tok_rahul_approver', body: { action: 'pause', reason: 'Stale wider copies found' },
+        what: 'Submit, approve, publish, roll back, pause, resume. Approve and publish need a second person. Submit returns the impact of the change in plain words.',
+        who: 'AdOps and approvers', pain: 'AB', why: 'This is where the core rule lives. A server holding a narrower old copy only under-delivers, so it is never paused. A wider copy can serve outside the target, so only that one is paused.',
+        mvp: 'Yes, week 5. Automatic pause enforcement comes after the pilot.',
+        look: '"pending" lists only edge_sg_1, the server with a wider copy. edge_mum_1 holds a narrower copy and is skipped with "alert and refresh instead of pausing". deal_tagger_1 never reported, so it is probed, not paused.',
+        alts: [
+          { label: 'AdOps tries to approve', token: 'tok_priya_adops', body: { action: 'approve', version: 3 }, look: '403. Only an approver can approve, and never a version they created. The rollback limits (a writer cannot widen reach, nobody can loosen consent) are proven in the Tests tab, under "Roles, four-eyes, tenant isolation".' }
+        ] },
+      { n: 6, title: 'Test a request', name: 'POST /v1/match', method: 'POST', path: '/v1/match?catalog_rev=3&compare=active', token: 'tok_priya_adops', body: bid(function (r) { r.device.geo.region = 'IN-DL'; r.site.domain = 'glow-deals-feed.example'; }),
+        what: 'Takes a sample bid request and says which segments it matches, at which tier, and why, clause by clause. It can replay the request against an older revision.',
+        who: 'AdOps, support, anyone checking a complaint', pain: 'AB', why: 'When a client asks "why did my ad show here?", this answers for the rule that was live at the time, not the rule live today.',
+        mvp: 'Yes, as the dry run in week 5. Ad servers keep their own matching. This is the reference, not the bid path.',
+        look: 'Under "compare": at revision 3 this request matched premium_north, but under today\'s rule the site is on the exclusion list. "diverges": true is exactly what a server still on revision 3 would get wrong.',
+        alts: [
+          { label: 'Same user, no consent', path: '/v1/match', body: bid(function (r) { delete r.regs; }), look: 'Tier 2, context only. Without a consent string the audience signal is ignored and the segment falls back to content category. The hub reads consent from user.consent, then user.ext.consent (OpenRTB 2.5), then regs.gpp.' }
+        ] },
+      { n: 7, title: 'Confirm what a server runs', name: 'POST /v1/consumers/{id}/acks', method: 'POST', path: '/v1/consumers/edge_us_1/acks', token: 'tok_edge_us_1', body: { catalog_rev: last.rev, hash: last.hash, state: 'active', exceptions: [] },
+        what: 'An ad server reports which revision it holds, and whether it has received it, accepted it, or is actually serving it.',
+        who: 'Ad servers and the deal tagger', pain: 'B', why: 'Only "active" counts as in sync. "Sent" is not the same as "serving", and that gap is the whole problem. These reports are also the only input the pilot metric needs.',
+        mvp: 'Yes, week 4.',
+        look: '"counts_as_in_sync": true and "behind_by": 0.',
+        alts: [
+          { label: 'Report for a different server', path: '/v1/consumers/edge_mum_1/acks', look: '403. A server\'s identity comes from its token, not from what it claims in the body.' },
+          { label: 'Report a wrong hash', body: { catalog_rev: last.rev, hash: 'deadbeef', state: 'active', exceptions: [] }, look: '409. The server is told its copy is corrupt and to pull it again.' }
+        ] }
     ];
+  }
+  function loadCase(p, alt, quiet) {
+    var e = JSON.parse(JSON.stringify(p)); e.alt = null;
+    if (alt) { ['path', 'token', 'body'].forEach(function (k) { if (alt[k] !== undefined) e[k] = JSON.parse(JSON.stringify(alt[k])); }); e.alt = alt.label; e.caseLook = alt.look; }
+    state.explorer = e; state.exRes = null; if (!quiet) render();
   }
   function allTokens() { return state.dstate ? state.dstate.tokens : []; }
   function curl(e) {
@@ -490,20 +560,40 @@ body.logopen main{padding-bottom:56vh}
     if (e.body) s += " -H 'Content-Type: application/json' -d '" + JSON.stringify(e.body) + "'";
     return s;
   }
+  var PAIN_TEXT = { A: 'Pain A: a wrong rule goes live', B: 'Pain B: ad servers run an out-of-date rule' };
   function renderApi(v) {
-    v.append(h('h2', {}, 'API explorer'), h('p', { class: 'lead' }, 'The seven endpoints, in six groups. Pick one, edit it, send it. Demo tokens are listed so you can try other roles and see what each one is allowed to do.'));
+    v.append(h('h2', {}, 'API explorer'),
+      h('div', { class: 'verdict info', style: 'font-weight:400' }, h('b', {}, 'How to use this. '),
+        'Seven endpoints, roughly in the order a segment lives: create it, version it, check it, ship it to ad servers, approve it, test it, and confirm it is serving. Each one is pre-filled. Press Send, then read "Look for". Start at 1, or jump to 5 to see the core rule: only risky stale copies get paused. "Reset demo" at the top puts everything back.'));
     var P = presets();
-    if (!state.explorer) state.explorer = JSON.parse(JSON.stringify(P[2]));
-    var e = state.explorer;
-    var bar = h('div', { class: 'row', style: 'margin-bottom:10px' }, P.map(function (p) { return h('button', { class: 'sm' + (p.name === e.name ? ' pri' : ''), onclick: function () { state.explorer = JSON.parse(JSON.stringify(p)); state.exRes = null; render(); } }, p.name); }));
-    v.append(bar);
+    if (!state.explorer) loadCase(P[0], null, true);
+    var e = state.explorer, g = P.filter(function (p) { return p.n === e.n; })[0] || P[0];
+    var list = h('div', { class: 'exlist' }, P.map(function (p) {
+      return h('button', { class: 'exitem' + (p.n === e.n ? ' on' : ''), onclick: function () { loadCase(p); } },
+        h('span', { class: 'exnum' }, p.n), h('span', {}, h('b', {}, p.title), h('span', { class: 'mono small muted', style: 'display:block' }, p.name)));
+    }));
+    var pains = g.pain.split('').map(function (c) { return chip(PAIN_TEXT[c], c === 'A' ? 'bad' : 'warn'); });
+    var guide = h('div', { class: 'card exguide' },
+      h('div', { class: 'row', style: 'gap:6px;margin-bottom:6px' }, h('h3', { style: 'margin:0' }, g.n + '. ' + g.title)),
+      h('div', { class: 'mono small muted', style: 'margin-bottom:8px' }, g.name),
+      h('dl', {},
+        h('dt', {}, 'What it does'), h('dd', {}, g.what),
+        h('dt', {}, 'Who calls it'), h('dd', {}, g.who),
+        h('dt', {}, 'Why it matters'), h('dd', {}, h('div', { class: 'row', style: 'gap:6px;margin-bottom:4px' }, pains), g.why),
+        h('dt', {}, 'In the MVP'), h('dd', {}, g.mvp),
+        h('dt', {}, 'Look for'), h('dd', {}, e.alt ? h('span', {}, h('b', {}, e.alt + ': '), e.caseLook) : g.look)),
+      h('div', { class: 'small muted', style: 'margin:10px 0 4px' }, 'Try another case'),
+      h('div', { class: 'row', style: 'gap:6px' },
+        h('button', { class: 'sm' + (!e.alt ? ' pri' : ''), onclick: function () { loadCase(g); } }, 'Main case'),
+        g.alts.map(function (a) { return h('button', { class: 'sm' + (e.alt === a.label ? ' pri' : ''), onclick: function () { loadCase(g, a); } }, a.label); })));
+    v.append(h('div', { class: 'exwrap' }, list, guide));
     var mIn = h('select', { onchange: function (x) { e.method = x.target.value; } }, ['GET', 'POST'].map(function (m) { return h('option', { value: m, selected: m === e.method }, m); }));
     var pIn = h('input', { type: 'text', value: e.path, style: 'flex:1;min-width:260px', oninput: function (x) { e.path = x.target.value; } });
     var tIn = h('select', { onchange: function (x) { e.token = x.target.value; } }, allTokens().map(function (t) { return h('option', { value: t.token, selected: t.token === e.token }, t.label); }));
     var bIn = h('textarea', { rows: 12, spellcheck: 'false', oninput: function (x) { e.bodyText = x.target.value; } }, e.bodyText !== undefined ? e.bodyText : (e.body ? JSON.stringify(e.body, null, 2) : ''));
-    v.append(h('div', { class: 'card' }, h('div', { class: 'muted small' }, e.note || ''),
+    v.append(h('div', { class: 'card' }, h('div', { class: 'muted small' }, 'Request. Edit anything, then send.'),
       h('div', { class: 'row', style: 'margin:8px 0' }, mIn, pIn, tIn, h('button', { class: 'pri sm', onclick: send }, 'Send')),
-      h('div', { class: 'muted small' }, 'Request body'), bIn,
+      e.method === 'POST' ? [h('div', { class: 'muted small' }, 'Request body'), bIn] : null,
       h('details', {}, h('summary', {}, 'As curl'), pre(curl(e)))));
     if (state.exRes) {
       var r = state.exRes;
@@ -518,7 +608,7 @@ body.logopen main{padding-bottom:56vh}
     async function send() {
       var u; try { u = new URL(e.path, 'http://x'); } catch (er) { toast('Bad path', 'bad'); return; }
       var query = {}; u.searchParams.forEach(function (val, k) { query[k] = val; });
-      var body; var txt = bIn.value.trim();
+      var body; var txt = e.method === 'POST' ? bIn.value.trim() : '';
       if (e.method === 'POST' && txt) { try { body = JSON.parse(txt); } catch (er) { toast('Body is not valid JSON: ' + er.message, 'bad'); return; } }
       state.exRes = await api(e.method, u.pathname, { token: e.token, query: query, body: body, headers: e.method === 'POST' ? { 'idempotency-key': uid() } : {} });
       await refreshDemo(); render();
