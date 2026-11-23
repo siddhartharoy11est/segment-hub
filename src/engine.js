@@ -138,7 +138,7 @@
       if (spec.ops.indexOf(op) < 0) { err('invalid_rule', "Operator '" + op + "' is not allowed on " + f, path); return; }
       if (op === 'not_in_list') {
         var ref = typeof val === 'string' ? parseListRef(val) : null;
-        if (!ref) { err('invalid_rule', 'not_in_list needs a list name like excl_mfa or excl_mfa@2', path); return; }
+        if (!ref) { err('invalid_rule', 'not_in_list needs a list name like excl_buyer_blocklist or excl_buyer_blocklist@2', path); return; }
         var info = listInfo ? listInfo(ref.name) : null;
         if (!info) { err('unknown_list', "Exclusion list '" + ref.name + "' does not exist", path); return; }
         if (ref.pin !== null && (ref.pin < 1 || ref.pin > info.versions)) { err('unknown_list', "List '" + ref.name + "' has no version " + ref.pin, path); }
@@ -977,13 +977,13 @@
         var p = S.pauses[sid + '|' + cid]; if (p) { p.state = 'confirmed'; p.confirmed_at = now(); confirmed.push(sid); }
       });
       audit(cid, 'consumer', 'ack', null, null, 'rev ' + rev + ' ' + body.state);
-      var stale = [];
+      var stale = [], detail = [];
       Object.keys(cur().segments).forEach(function (sid) {
         var r = syncFor(sid).filter(function (x) { return x.consumer_id === cid; })[0];
-        if (r && r.state !== 'in_sync') stale.push(sid);
+        if (r && r.state !== 'in_sync') { stale.push(sid); detail.push({ segment_id: sid, held_version: r.held_version, classification: r.classification, risk: r.risk, recommended_action: r.recommended_action }); }
       });
       return { status: 200, body: { consumer_id: cid, recorded: { received_rev: c.received_rev, accepted_rev: c.accepted_rev, active_rev: c.active_rev }, current_catalog_rev: cur().rev,
-        counts_as_in_sync: body.state === 'active', behind_by: cur().rev - (c.active_rev == null ? 0 : c.active_rev), stale_segments: stale, confirmed_pauses: confirmed,
+        counts_as_in_sync: body.state === 'active' && c.active_rev === cur().rev, behind_by: cur().rev - (c.active_rev == null ? 0 : c.active_rev), stale_segments: stale, stale_detail: detail, confirmed_pauses: confirmed,
         note: body.state === 'active' ? null : 'Only an active ack counts as in sync. ' + body.state + ' does not prove the copy drives serving decisions.' } };
     }
 
@@ -1108,19 +1108,19 @@
       function sync(cid) { var r = consumerSync(cid); return r.body; }
       var tier = function (cats) { return [{ tier: 1, all: [{ field: 'audience.purchase_skincare_30d', eq: true }, { field: 'site.cat', in: ['IAB18-1'] }] }, { tier: 2, all: [{ field: 'site.cat', in: cats }] }]; };
       var festive = function (regions, cats) {
-        return { must: [{ field: 'device.geo.region', in: regions }, { field: 'device.type', in: ['mobile', 'tablet'] }, { field: 'site.domain', not_in_list: 'excl_mfa' }], should: tier(cats), if_audience_missing: 'fall_back_to_context' };
+        return { must: [{ field: 'device.geo.region', in: regions }, { field: 'device.type', in: ['mobile', 'tablet'] }, { field: 'site.domain', not_in_list: 'excl_buyer_blocklist' }], should: tier(cats), if_audience_missing: 'fall_back_to_context' };
       };
       T(-360);
-      S.lists.excl_mfa = { name: 'excl_mfa', versions: [{ version: 1, domains: ['cheap-clicks.example', 'viral-feed.example'], created_at: now() }] };
+      S.lists.excl_buyer_blocklist = { name: 'excl_buyer_blocklist', versions: [{ version: 1, domains: ['cheap-clicks.example', 'viral-feed.example'], created_at: now() }] };
       go('seg_glowroot_festive_east', festive(['IN-WB'], ['IAB18-1']), 'GlowRoot Festive East India');
       T(-359);
-      go('seg_glowroot_premium_north', { must: [{ field: 'device.geo.region', in: ['IN-DL', 'IN-HR'] }, { field: 'device.type', in: ['mobile', 'tablet', 'desktop'] }, { field: 'site.domain', not_in_list: 'excl_mfa' }],
+      go('seg_glowroot_premium_north', { must: [{ field: 'device.geo.region', in: ['IN-DL', 'IN-HR'] }, { field: 'device.type', in: ['mobile', 'tablet', 'desktop'] }, { field: 'site.domain', not_in_list: 'excl_buyer_blocklist' }],
         should: [{ tier: 1, all: [{ field: 'audience.purchase_skincare_30d', eq: true }, { field: 'site.cat', in: ['IAB18-1'] }] }, { tier: 2, all: [{ field: 'site.cat', in: ['IAB18-1'] }] }], if_audience_missing: 'fall_back_to_context', strict_compliance: true }, 'GlowRoot Premium North');
       T(-300);
       go('seg_glowroot_festive_east', festive(['IN-WB'], ['IAB18-1', 'IAB18-3']));
       T(-290); sync('edge_mum_1'); sync('edge_us_1'); sync('edge_sg_1');
       T(-5);
-      handle({ method: 'POST', path: '/v1/demo/lists/excl_mfa/domains', body: { domain: 'glow-deals-feed.example' } });
+      handle({ method: 'POST', path: '/v1/demo/lists/excl_buyer_blocklist/domains', body: { domain: 'glow-deals-feed.example' } });
       T(-4); sync('edge_mum_1');
       T(-3);
       go('seg_glowroot_festive_east', festive(['IN-WB', 'IN-OD'], ['IAB18-1', 'IAB18-3']));
