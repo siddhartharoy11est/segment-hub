@@ -14,7 +14,7 @@
 
     function mk(extra) {
       var h = E.createHub(Object.assign({ now: function () { return BASE; }, seed: false }, extra || {}));
-      h.state().lists.excl_mfa = { name: 'excl_mfa', versions: [{ version: 1, domains: ['cheap-clicks.example', 'viral-feed.example'], created_at: BASE }] };
+      h.state().lists.excl_buyer_blocklist = { name: 'excl_buyer_blocklist', versions: [{ version: 1, domains: ['cheap-clicks.example', 'viral-feed.example'], created_at: BASE }] };
       return h;
     }
     function call(h, tok, method, path, body, query, headers) {
@@ -24,7 +24,7 @@
     var T2 = { tier: 2, all: [{ field: 'site.cat', in: ['IAB18-1'] }] };
     function rule(o) {
       return Object.assign({
-        must: [{ field: 'device.geo.region', in: ['IN-WB', 'IN-OD'] }, { field: 'device.type', in: ['mobile', 'tablet'] }, { field: 'site.domain', not_in_list: 'excl_mfa' }],
+        must: [{ field: 'device.geo.region', in: ['IN-WB', 'IN-OD'] }, { field: 'device.type', in: ['mobile', 'tablet'] }, { field: 'site.domain', not_in_list: 'excl_buyer_blocklist' }],
         should: [T1, T2], if_audience_missing: 'fall_back_to_context'
       }, o || {});
     }
@@ -67,7 +67,7 @@
     t(G1, 'tablet is allowed', function () { assert.equal(match(setup(), req(function (r) { r.device.type = 'tablet'; })).matches.length, 1); });
     t(G1, 'site on an exclusion list is excluded and names list and version', function () {
       var m = match(setup(), req(function (r) { r.site.domain = 'cheap-clicks.example'; }));
-      assert.equal(m.matches.length, 0); assert.ok(m.excluded[0].reason.indexOf('excl_mfa') > -1 && m.excluded[0].reason.indexOf('v1') > -1);
+      assert.equal(m.matches.length, 0); assert.ok(m.excluded[0].reason.indexOf('excl_buyer_blocklist') > -1 && m.excluded[0].reason.indexOf('v1') > -1);
     });
     t(G1, 'a subdomain of a listed site is excluded too', function () { assert.equal(match(setup(), req(function (r) { r.site.domain = 'm.cheap-clicks.example'; })).matches.length, 0); });
     t(G1, 'a look-alike domain is not excluded (suffix boundary)', function () { assert.equal(match(setup(), req(function (r) { r.site.domain = 'notcheap-clicks.example'; })).matches.length, 1); });
@@ -131,7 +131,7 @@
     });
     t(G4, 'an exclusion-list update changes the effective fingerprint without a new segment version', function () {
       var h = setup(); var before = call(h, 'tok_priya_adops', 'GET', '/v1/segments/seg_a').body;
-      var up = call(h, 'tok_admin', 'POST', '/v1/demo/lists/excl_mfa/domains', { domain: 'new-spam.example' });
+      var up = call(h, 'tok_admin', 'POST', '/v1/demo/lists/excl_buyer_blocklist/domains', { domain: 'new-spam.example' });
       assert.equal(up.status, 200); var after = call(h, 'tok_priya_adops', 'GET', '/v1/segments/seg_a').body;
       assert.equal(after.versions.length, before.versions.length); assert.equal(after.active.fingerprint, before.active.fingerprint);
       assert.notEqual(after.active.effective_fingerprint, before.active.effective_fingerprint); assert.equal(up.body.affected_segments.length, 1);
@@ -333,7 +333,7 @@
       call(h, 'tok_admin', 'POST', '/v1/demo/advance', { seconds: 901 }); assert.equal(row(h, 'seg_s', 'edge_sg_1').local_expiry_outcome, 'fail_closed');
     });
     t(G7, 'an exclusion-list update marks an old-revision consumer as a wider stale copy', function () {
-      var h = setup(); syncAll(h, ['edge_sg_1', 'edge_us_1']); call(h, 'tok_admin', 'POST', '/v1/demo/lists/excl_mfa/domains', { domain: 'glow-deals-feed.example' }); syncAll(h, ['edge_us_1']);
+      var h = setup(); syncAll(h, ['edge_sg_1', 'edge_us_1']); call(h, 'tok_admin', 'POST', '/v1/demo/lists/excl_buyer_blocklist/domains', { domain: 'glow-deals-feed.example' }); syncAll(h, ['edge_us_1']);
       var r = row(h, 'seg_a', 'edge_sg_1'); assert.equal(r.classification, 'wider_superset'); assert.equal(r.risk, 'high'); assert.equal(row(h, 'seg_a', 'edge_us_1').state, 'in_sync');
       var site = req(function (x) { x.site.domain = 'glow-deals-feed.example'; });
       var m = match(h, site, { catalog_rev: 1, compare: 'active' }); assert.equal(m.matches.length, 1); assert.equal(m.compare.diverges, true); assert.equal(m.compare.active.matches.length, 0);
