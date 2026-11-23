@@ -215,9 +215,9 @@ body.logopen main{padding-bottom:56vh}
       body: bid(function (r) { r.id = 'req-s2'; delete r.regs; }),
       facts: ['Kolkata (IN-WB)', 'mobile', 'no consent string', 'beauty blog'],
       verdict: function (b) { var m = find(b.matches, 'seg_glowroot_festive_east'); return m ? { tone: 'warn', head: 'MATCH, tier 2 (context only)', text: 'Without consent the audience signal is ignored, so the request still qualifies on page context but at lower priority. ' + m.reason } : { tone: 'bad', head: 'No match', text: 'Unexpected.' }; } },
-    { n: 3, title: 'Consented purchaser on a made-for-advertising site', shows: 'Exclusion list overrides everything', seg: 'seg_glowroot_festive_east', query: {},
+    { n: 3, title: 'Consented purchaser on a site the buyer blocked', shows: 'Exclusion list overrides everything', seg: 'seg_glowroot_festive_east', query: {},
       body: bid(function (r) { r.id = 'req-s3'; r.site.domain = 'cheap-clicks.example'; }),
-      facts: ['Kolkata (IN-WB)', 'mobile', 'consent granted', 'site cheap-clicks.example (on excl_mfa)'],
+      facts: ['Kolkata (IN-WB)', 'mobile', 'consent granted', 'site cheap-clicks.example (on excl_buyer_blocklist)'],
       verdict: function (b) { var e = find(b.excluded, 'seg_glowroot_festive_east'); return e ? { tone: 'bad', head: 'EXCLUDED', text: e.reason } : { tone: 'bad', head: 'Unexpected', text: 'The site should have been excluded.' }; } },
     { n: 4, title: 'Mumbai edge cluster still on an older rule (narrower copy)', shows: 'Stale copy that under-delivers. No pause: alert and refresh', seg: 'seg_glowroot_festive_east', query: { catalog_rev: 4, compare: 'active' },
       body: bid(function (r) { r.id = 'req-s4'; r.device.geo.region = 'IN-OD'; }),
@@ -228,10 +228,10 @@ body.logopen main{padding-bottom:56vh}
       }, link: ['sync', 'seg_glowroot_festive_east', 'See it on the sync board'] },
     { n: 5, title: 'Singapore edge cluster missed an exclusion-list update (wider copy)', shows: 'Stale copy that leaks. High risk: pause request, countdown, kill switch', seg: 'seg_glowroot_premium_north', query: { catalog_rev: 3, compare: 'active' },
       body: bid(function (r) { r.id = 'req-s5'; r.device.geo.region = 'IN-DL'; r.site.domain = 'glow-deals-feed.example'; }),
-      facts: ['Delhi (IN-DL)', 'mobile', 'consent granted', 'site glow-deals-feed.example, added to excl_mfa in rev 4', 'replayed against catalog rev 3, what the Singapore cluster holds'],
+      facts: ['Delhi (IN-DL)', 'mobile', 'consent granted', 'site glow-deals-feed.example, added to excl_buyer_blocklist in rev 4', 'replayed against catalog rev 3, what the Singapore cluster holds'],
       verdict: function (b) {
         var d = b.compare && find(b.compare.differences, 'seg_glowroot_premium_north');
-        return d ? { tone: 'bad', head: 'DIVERGES: the stale copy serves what the active version excludes', text: 'The Singapore cluster is on catalog rev 3, before the site was added to the MFA list. It would be ' + d.held + ' while the active catalog says ' + d.active + '. That is a wider stale copy: a leak and a brand-safety risk. Policy: request a pause. If the cluster cannot be reached, use the kill switch, then the segment\'s local expiry (15 minutes, because this segment is strict).' } : { tone: 'bad', head: 'No divergence', text: 'Unexpected. Reset the demo.' };
+        return d ? { tone: 'bad', head: 'DIVERGES: the stale copy serves what the active version excludes', text: 'The Singapore cluster is on catalog rev 3, before the site was added to the buyer blocklist. It would be ' + d.held + ' while the active catalog says ' + d.active + '. That is a wider stale copy: a leak and a brand-safety risk. Policy: request a pause. If the cluster cannot be reached, use the kill switch, then the segment\'s local expiry (15 minutes, because this segment is strict).' } : { tone: 'bad', head: 'No divergence', text: 'Unexpected. Reset the demo.' };
       }, link: ['sync', 'seg_glowroot_premium_north', 'See it on the sync board'] }
   ];
   async function runScenario(s) {
@@ -432,7 +432,7 @@ body.logopen main{padding-bottom:56vh}
       h('span', { class: 'muted small' }, 'Move the clock:'),
       [[900, '+15 min'], [3600, '+1 hour'], [14400, '+4 hours']].map(function (x) { return h('button', { class: 'sm', onclick: function () { demoCall('/v1/demo/advance', { seconds: x[0] }, function () { return 'Clock moved ' + x[1]; }); } }, x[1]); })),
       h('div', { class: 'row', style: 'margin-top:8px' }, h('span', { class: 'muted small' }, 'Exclusion-list owner adds a site (one approval for the list, no new segment versions):'), site,
-        h('button', { class: 'sm', onclick: function () { demoCall('/v1/demo/lists/excl_mfa/domains', { domain: site.value }, function (r) { return r.status < 300 ? 'excl_mfa v' + r.body.version + ' published, catalog rev ' + r.body.catalog_rev + '. Servers on older revisions are now stale.' : errText(r); }); } }, 'Add to excl_mfa'))));
+        h('button', { class: 'sm', onclick: function () { demoCall('/v1/demo/lists/excl_buyer_blocklist/domains', { domain: site.value }, function (r) { return r.status < 300 ? 'excl_buyer_blocklist v' + r.body.version + ' published, catalog rev ' + r.body.catalog_rev + '. Servers on older revisions are now stale.' : errText(r); }); } }, 'Add to excl_buyer_blocklist'))));
     var s = state.sync;
     if (!s) { v.append(h('div', { class: 'card' }, state.syncErr || 'Loading')); return; }
     var sum = s.sync.summary;
@@ -483,7 +483,7 @@ body.logopen main{padding-bottom:56vh}
   // Each endpoint carries a short guide (what, who, why, MVP, what to look for) and extra cases that show a refusal or an edge.
   function presets() {
     var d = state.dstate, last = d ? d.catalog[d.catalog.length - 1] : { rev: 0, hash: '' };
-    var rule = { must: [{ field: 'device.geo.region', in: ['IN-WB', 'IN-OD'] }, { field: 'device.type', in: ['mobile'] }, { field: 'site.domain', not_in_list: 'excl_mfa' }], should: [{ tier: 1, all: [{ field: 'audience.purchase_skincare_30d', eq: true }, { field: 'site.cat', in: ['IAB18-1'] }] }, { tier: 2, all: [{ field: 'site.cat', in: ['IAB18-1'] }] }], if_audience_missing: 'fall_back_to_context' };
+    var rule = { must: [{ field: 'device.geo.region', in: ['IN-WB', 'IN-OD'] }, { field: 'device.type', in: ['mobile'] }, { field: 'site.domain', not_in_list: 'excl_buyer_blocklist' }], should: [{ tier: 1, all: [{ field: 'audience.purchase_skincare_30d', eq: true }, { field: 'site.cat', in: ['IAB18-1'] }] }, { tier: 2, all: [{ field: 'site.cat', in: ['IAB18-1'] }] }], if_audience_missing: 'fall_back_to_context' };
     var typo = JSON.parse(JSON.stringify(rule)); typo.must[0].field = 'device.geo.regoin';
     var seg = '/v1/segments/seg_glowroot_festive_east';
     return [
@@ -544,6 +544,7 @@ body.logopen main{padding-bottom:56vh}
         look: '"counts_as_in_sync": true and "behind_by": 0.',
         alts: [
           { label: 'Report for a different server', path: '/v1/consumers/edge_mum_1/acks', look: '403. A server\'s identity comes from its token, not from what it claims in the body.' },
+          { label: 'A server on an old revision', path: '/v1/consumers/edge_sg_1/acks', token: 'tok_edge_sg_1', body: { catalog_rev: 3, hash: (d && d.catalog[3] ? d.catalog[3].hash : ''), state: 'active', exceptions: [] }, look: '"counts_as_in_sync": false, "behind_by": 2, and "stale_detail" names each segment it holds out of date, the risk, and the recommended action. Singapore missed the blocklist update, so its copies are wider and get a pause request.' },
           { label: 'Report a wrong hash', body: { catalog_rev: last.rev, hash: 'deadbeef', state: 'active', exceptions: [] }, look: '409. The server is told its copy is corrupt and to pull it again.' }
         ] }
     ];

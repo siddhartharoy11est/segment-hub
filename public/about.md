@@ -18,7 +18,7 @@ All data in this prototype is simulated for demonstration. The brand (GlowRoot, 
 | | |
 |---|---|
 | **The brief** | Create an internal API for targeting segments. Define key endpoints, request and response formats, and security |
-| **The problem** | When a targeting rule changes, nobody can confirm that every ad system is using the new version. The first signal is usually the client |
+| **The problem** | When a targeting rule changes, nobody can confirm that every ad system is using the new version. My hypothesis is that the buyer can find out before Media.net does |
 | **Who uses it** | AdOps builds and publishes segments. An approver reviews new rules. Ad servers pull the rules and report which version they hold |
 | **What the hub does** | Keeps one source of truth, numbers every version, collects acknowledgements from ad servers, and classifies a stale copy as low risk or high risk |
 | **What it does not do** | Match requests at bid time, score users, or hold user data. There is no AI model in the decision path |
@@ -44,7 +44,7 @@ The brief asks for endpoints, request and response formats, and security. It doe
 **Pain A: a wrong rule goes live.** **Pain B: ad servers run an out-of-date rule.**
 [[/PAIN-LEGEND]]
 
-**Problem statement.** When a targeting rule changes, nobody can confirm that every ad server is using the new version, and the first signal is usually the client.
+**Problem statement.** When a targeting rule changes, nobody can confirm that every ad server is using the new version. My hypothesis is that the buyer can find out before Media.net does, and the pilot tests it.
 
 **What one API can and cannot do.** An API cannot force an ad server to update. It can hold one source of truth, number the versions, collect acknowledgements, identify which servers are behind, classify the risk and request a pause. It cannot repair a server that is down or correct poor location data.
 
@@ -96,7 +96,7 @@ Two groups use the product, one reviews, and the rest are affected by what it do
 
 **Who it affects.** AdOps, the ad server teams and the advertisers whose rules they run, wherever targeting rules are changed centrally and served from many places.
 
-**Why it matters.** A rule can be correct where it was written and wrong where it is served. The server holding an old copy keeps serving, nothing errors, and the first signal is the client finding their ad on a site they excluded.
+**Why it matters.** A rule can be correct where it was written and wrong where it is served. The server holding an old copy keeps serving, nothing errors, and the first to notice could be the buyer, finding their ad on a site they blocked.
 
 ### How a stale rule keeps serving
 
@@ -106,7 +106,7 @@ Two groups use the product, one reviews, and the rest are affected by what it do
 
 | | |
 |---|---|
-| Client request | Exclude a list of made-for-advertising sites |
+| Client request | Exclude the buyer's own list of blocked sites |
 | Change | A site is added to the exclusion list at revision 4 |
 | One cluster | Still holds revision 3, so it still serves on that site |
 | Impressions per hour on that cluster | 5,00,000 |
@@ -130,7 +130,7 @@ Try it in about three minutes. The page opens as Priya, who works in AdOps. Use 
 | Journey | Who | What you do | What you will see |
 |---|---|---|---|
 | **Start here. Replay the incident** | Priya | Story tab, click "Replay the incident" and press Next through five steps | A narrowing change is published, one cluster keeps the old rule, and the board classifies it. The whole case in one minute |
-| **A. A normal request** | Anyone | Run Requests 1, 2 and 3 on the Story tab | A match at tier 1, a fallback to context only when consent is missing, and an exclusion on a made-for-advertising site |
+| **A. A normal request** | Anyone | Run Requests 1, 2 and 3 on the Story tab | A match at tier 1, a fallback to context only when consent is missing, and an exclusion on a site the buyer blocked |
 | **B. A narrower stale copy** | Anyone | Run Request 4 | The Singapore cluster holds an older rule. It under-delivers but does not leak, so the policy is alert and refresh, never pause |
 | **C. A wider stale copy** | Anyone | Run Request 5, then open the Sync board | The Mumbai cluster missed an exclusion update. It is high risk, with a pause request and a strict 15 minute expiry countdown |
 | **D. Publish with a second person** | Priya, then Rahul | Segments tab, change the rule in the editor, save it as a new version, then click "Run full flow" on that draft | The creator cannot approve or publish. A plain-language impact warning and an estimated change in daily reach appear at submit |
@@ -319,7 +319,7 @@ The direct leak in section 3 is small. The value of the hub rests on two other t
 
 [[VISUAL: break-even]]
 
-- **What an incident costs in practice.** A client who finds their exclusion list was not applied asks for make-goods or credits, and disputes spend on brand safety or made-for-advertising placements. I count those, plus the contract at risk, and not the leaked impressions alone.
+- **What an incident costs in practice.** A buyer who finds their blocklist was not applied on a curated deal can pull the deal's remaining spend, dispute what ran, and question the renewal. I count those, plus the contract at risk, and not the leaked impressions alone.
 - **Value per incident avoided** is the campaign value times the share the client withdraws or has credited, plus the hours spent on the incident times an hourly cost.
 - **Break-even** is the annual cost to build and run the hub divided by the value per incident.
 - **Illustrative defaults.** A ₹25,00,000 campaign, 20% withdrawn or credited, 30 hours at ₹2,000 an hour, and an annual cost of ₹84,00,000. That gives ₹5,60,000 per incident and a break-even of 15 incidents a year. Replace these with Media.net's own figures. The baseline in shadow mode would show whether 15 is plausible.
