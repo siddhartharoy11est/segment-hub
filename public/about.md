@@ -22,8 +22,8 @@ All data in this prototype is simulated for demonstration. The brand (GlowRoot, 
 | **Who uses it** | AdOps builds and publishes segments. An approver reviews new rules. Ad servers pull the rules and report which version they hold |
 | **What the hub does** | Keeps one source of truth, numbers every version, collects acknowledgements from ad servers, and classifies a stale copy as low risk or high risk |
 | **What it does not do** | Match requests at bid time, score users, or hold user data. There is no AI model in the decision path |
-| **Headline metric** | Share of segment-tagged impressions served under a version other than the active one, after the propagation window. The pilot starts with a version I can measure from acknowledgements alone: high-risk stale exposure |
-| **Try it** | 1 minute. Open the Story tab and click "Replay the incident". Then run Request 4 and open the Sync board |
+| **North star** | In the pilot: estimated high-risk stale exposure, measured from acknowledgements alone. Later, once ad servers log the version: the share of segment-tagged impressions served under an old version |
+| **Try it** | 1 minute. Open the Story tab and click "Replay the incident". Then run Request 5 and open the Sync board |
 
 ---
 
@@ -72,10 +72,10 @@ The brief asks for endpoints, request and response formats, and security. It doe
 | AppNexus 2013 outage postmortem | A routine data update exposed a latent bug in the impression bus and reached roughly 900 servers at once. Recovery used a tested snapshot, and the fixes include validation before distribution and reliable return to a known good state | Stage releases, validate before distributing, and keep a tested last known good copy |
 | Xandr incident, January 2021 | Impression buses were rolled back to an older configuration, with the first 10% resuming first | A rollback path and a staged restart |
 | OpenRTB 2.6 | Defines `device.devicetype`, `device.geo.region`, `site.cat` with `cattax`, `regs.gpp` and `user.consent` | The request format the hub reads |
-| IAB Content Taxonomy 1.0 | Beauty is IAB18-1. IAB Tech Lab has deprecated 1.0 and publishes 3.0 | The code is used in the demo only because it is short and readable. A production build would use 3.0 and set `cattax` to match |
+| IAB Content Taxonomy 1.0 | Beauty is IAB18-1. IAB Tech Lab has deprecated 1.0; the current version is 3.1 | The code is used in the demo only because it is short and readable. A production build would use 3.1 and set `cattax` to 9 |
 | Consent frameworks: India's DPDP Act, EU GDPR with the IAB TCF, US state laws signalled through GPP | DPDP consent obligations phase in by May 2027. The EU is opt-in and granular. Most US state laws are opt-out | Consent is a per-jurisdiction check, not one global flag. The prototype simplifies it to one flag and says so |
 
-These sources establish that propagation delay and bad pushes are real. They do not establish how often drift causes wrong delivery at Media.net, so I treat that as an assumption and measure it first (sections 5 and 6).
+These sources establish that propagation delay and bad configuration changes are real. They do not establish how often drift causes wrong delivery at Media.net, so I treat that as an assumption and measure it first (sections 5 and 6).
 
 ---
 
@@ -129,10 +129,10 @@ Try it in about three minutes. The page opens as Priya, who works in AdOps. Use 
 
 | Journey | Who | What you do | What you will see |
 |---|---|---|---|
-| **Start here. Replay the incident** | Priya | Story tab, click "Replay the incident" and press Next through five steps | A narrowing change is published, one cluster keeps the old rule, and the board classifies it. The whole case in one minute |
+| **Start here. Replay the incident** | Priya | Story tab, click "Replay the incident" and press Next through five steps | A blocklist update is published, one cluster keeps the old copy, and the board classifies it. The whole case in one minute |
 | **A. A normal request** | Anyone | Run Requests 1, 2 and 3 on the Story tab | A match at tier 1, a fallback to context only when consent is missing, and an exclusion on a site the buyer blocked |
-| **B. A narrower stale copy** | Anyone | Run Request 4 | The Singapore cluster holds an older rule. It under-delivers but does not leak, so the policy is alert and refresh, never pause |
-| **C. A wider stale copy** | Anyone | Run Request 5, then open the Sync board | The Mumbai cluster missed an exclusion update. It is high risk, with a pause request and a strict 15 minute expiry countdown |
+| **B. A narrower stale copy** | Anyone | Run Request 4 | The Mumbai cluster holds an older rule. It under-delivers but does not leak, so the policy is alert and refresh, never pause |
+| **C. A wider stale copy** | Anyone | Run Request 5, then open the Sync board | The Singapore cluster missed a blocklist update. Its copy is wider, so it is high risk and gets a pause request. Premium North is a strict segment, so it shows a 15 minute expiry countdown. Festive East is standard, for comparison, at 4 hours |
 | **D. Publish with a second person** | Priya, then Rahul | Segments tab, change the rule in the editor, save it as a new version, then click "Run full flow" on that draft | The creator cannot approve or publish. A plain-language impact warning and an estimated change in daily reach appear at submit |
 | **E. An emergency** | Priya | Roll back or pause alone, with a reason | It works without a second person, within the limits in 4.2, and the audit log records who and why |
 | **F. Cause drift yourself** | Priya | Add a site to the exclusion list, then move the clock forward | A cluster turns stale, the board classifies it, and the countdown to local expiry runs |
@@ -164,7 +164,7 @@ When a new version is published, the hub compares it with the old one on every c
 | Adds a region, or removes a condition or an exclusion | Narrower. Under-delivers | Low | Alert and refresh. Never pause | Built |
 | Removes a region, adds a condition, or adds a site to an exclusion list | Wider. Can serve outside the target | High | Request a pause on that server | Built |
 | Changes in both directions at once | Mixed, treated as wider | High | Request a pause on that server | Built |
-| Requires audience data and consent more strictly | Wider on consent | Critical | Request a pause and escalate to the kill switch immediately. No grace window | Built |
+| Requires audience data and consent more strictly | Wider on consent | Critical | Request a pause and escalate to the kill switch immediately. No grace window | Built in the demo. The consent string is read, not decoded |
 | Changes only priority tiers | Same eligibility, different priority, so yield and pacing can drift | Low | Alert and refresh. Never pause | Built |
 | Changes only the name or metadata | Same fingerprint | None | No alert | Built |
 | Cannot be compared | Treated as wider | High | Request a pause on that server | Built |
@@ -223,7 +223,7 @@ The hub depends on the ad servers. This is the minimum contract, and what they g
 
 ## 5. Success metrics
 
-### Headline metric
+### Outcome metric, once versions are logged
 
 **Stale-version impression share:** the share of segment-tagged impressions served under a version other than the active one, after the propagation window.
 
@@ -263,7 +263,7 @@ The headline is never allowed to improve at the cost of any of these.
 
 | Guardrail | Limit | Why | If breached |
 |---|---|---|---|
-| Consent violations | **0**, with no grace window | The hard line for any audience rule | Release blocker |
+| Consent violations (demo policy; production needs a privacy component) | **0**, with no grace window | The hard line for any audience rule | Release blocker |
 | A snapshot accepted without a valid signature | **0** | The trust model depends on it | Release blocker |
 | Narrower stale copies paused | **0** | Pausing under-delivery destroys valid revenue | Fix the classification |
 | A rollback that loosens consent or audience requirements | **0** | An emergency path must not undo a privacy tightening | Release blocker |
@@ -351,4 +351,4 @@ The direct leak in section 3 is small. The value of the hub rests on two other t
 - IAB Tech Lab, Content Taxonomy versions and the deprecation of 1.0: https://dev.iabtechlab.com/standards/content-taxonomy/
 - India, DPDP Rules 2025 and the phased timeline (Storyboard18, 14 November 2025): https://www.storyboard18.com/amp/digital/breaking-govt-notifies-final-dpdp-rules-sets-staggered-rollout-with-key-obligations-for-data-fiduciaries-84201.htm
 - IAB Europe, Transparency and Consent Framework: https://iabeurope.eu/transparency-consent-framework/
-- IAB Tech Lab, Global Privacy Protocol (GPP): https://iabtechlab.com/gpp/
+- IAB Tech Lab, Global Privacy Platform (GPP): https://iabtechlab.com/gpp/
