@@ -439,7 +439,7 @@ body.logopen main{padding-bottom:56vh}
     v.append(h('div', { class: 'grid g4' },
       h('div', { class: 'tile' }, h('b', {}, sum.stale_version_impression_share_pct + '%'), h('span', {}, 'Traffic on servers that are behind, right now (simulated shares)')),
       h('div', { class: 'tile' }, h('b', {}, sum.high_risk_stale_share_pct + '%'), h('span', {}, 'of traffic on a high-risk stale copy')),
-      h('div', { class: 'tile' }, h('b', {}, String(sum.high_risk_stale_exposure_traffic_minutes)), h('span', {}, 'High-risk stale exposure: traffic share times minutes behind. Measured from acks alone, so it works from day one')),
+      h('div', { class: 'tile' }, h('b', {}, String(sum.high_risk_stale_exposure_traffic_minutes) + ' share-weighted min'), h('span', {}, 'High-risk stale exposure: traffic share times minutes behind. Measured from acks alone, so it works from day one')),
       h('div', { class: 'tile' }, h('b', {}, sum.ack_coverage_pct + '%'), h('span', {}, 'Ack coverage. ' + sum.unknown_share_pct + '% of traffic is on servers we cannot confirm, so read the numbers beside it with this'))));
     var tbl = h('table', {}, h('tr', {}, ['Consumer', 'State', 'Holds', 'Versus active', 'Local expiry', 'Policy', ''].map(function (x) { return h('th', {}, x); })));
     s.sync.consumers.forEach(function (c) {
