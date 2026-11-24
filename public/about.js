@@ -14,7 +14,7 @@
   var PAINS = { A: 'a wrong rule goes live', B: 'ad servers run an out-of-date rule' };
   var VISUALS = ['problem-flow', 'metric-tree', 'break-even', 'example-calc'];
   // Rows of the policy table (4.2) that can be tried elsewhere in the prototype.
-  var EXPLORER_TRY = { 0: ['story', 'Run Request 4 on the Story tab'], 1: ['story', 'Run Request 5 on the Story tab, then open the Sync board'] };
+  var EXPLORER_TRY = { 0: ['story', 'Run Request 4 on the Story tab'], 1: ['story', 'Replay the incident on the Story tab'], 7: ['sync', 'Cut off a server on the Sync board'] };
 
   // ------------------------------------------------------------ numbers
   function groupIN(n) {
@@ -192,7 +192,7 @@
     var box = el('div', { class: 'explorer' }, el('p', { class: 'xhint' }, 'Select any row to see it in plain words.'), scroll, panel);
     function pick(idx) {
       trs.forEach(function (tr, i) { tr.classList.toggle('sel', i === idx); tr.setAttribute('aria-pressed', i === idx ? 'true' : 'false'); });
-      var r = b.rows[idx], lines = [['What changed', r[0]], ['An old copy is', r[1]], ['Risk', r[2]], ['Hub action', r[3]], ['Status', r[4]]];
+      var r = b.rows[idx], lines = [['What changed', r[0]], ['An old copy is', r[1]], ['Risk', r[2]], ['What happens', r[3]], ['Status', r[4]]];
       panel.innerHTML = '';
       lines.forEach(function (l) { panel.append(el('div', { class: 'xline' }, el('span', { class: 'xk' }, l[0]), el('span', {}, l[1]))); });
       if (EXPLORER_TRY[idx]) panel.append(el('div', { class: 'xline' }, el('button', { type: 'button', class: 'sm', onclick: function () { ctx.go(EXPLORER_TRY[idx][0]); } }, EXPLORER_TRY[idx][1] + ' >')));
@@ -207,7 +207,7 @@
 
   // ------------------------------------------------------------ visuals
   function problemFlow() {
-    var steps = ['The client asks for a rule', 'The rule or a list is updated', 'One ad server misses the update', 'That server keeps serving on the old rule', 'The client notices first'];
+    var steps = ['The client asks for a rule', 'The rule or a list is updated', 'One ad server misses the update', 'That server keeps the deal eligible on the old rule', 'The client notices first'];
     var ol = el('ol', { class: 'flow' });
     steps.forEach(function (s, i) {
       ol.append(el('li', { class: i === 2 ? 'catch' : i === 4 ? 'late' : '' },

@@ -41,18 +41,18 @@ const tests = [
       assert.equal(open, close, k);
     });
   }],
-  ['the seven endpoints are listed, each tagged with a pain', () => {
+  ['the nine endpoints are listed, each tagged with a pain', () => {
     const t = blocks.find(b => b.type === 'table' && b.header[1] === 'Endpoint');
-    assert.ok(t, 'endpoint table missing'); assert.equal(t.rows.length, 7);
+    assert.ok(t, 'endpoint table missing'); assert.equal(t.rows.length, 9);
     t.rows.forEach(r => assert.ok(A.painsIn(r.join('|')).length > 0, 'untagged ' + r[1]));
-    assert.deepEqual(A.painsIn(t.rows[4].join('|')), ['A', 'B']);
+    assert.deepEqual(A.painsIn(t.rows[3].join('|')), ['A', 'B']);
   }],
   ['the policy table has eight rows', () => {
     const t = blocks.find(b => b.type === 'table' && b.header[0] === 'What the new version changed');
     assert.ok(t); assert.equal(t.rows.length, 8);
   }],
   ['no em dash or en dash anywhere in the page text or renderer', () => {
-    ['../public/about.md', '../public/about.js', '../public/index.html'].forEach(f => {
+    ['../public/about.md', '../public/about.js', '../public/index.html', '../public/docs.html', '../public/openapi.json'].forEach(f => {
       const s = fs.readFileSync(path.join(__dirname, f), 'utf8');
       assert.ok(!/[–—]/.test(s), f + ' has a dash character');
     });

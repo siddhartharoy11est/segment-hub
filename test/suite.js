@@ -14,7 +14,7 @@
 
     function mk(extra) {
       var h = E.createHub(Object.assign({ now: function () { return BASE; }, seed: false }, extra || {}));
-      h.state().lists.excl_buyer_blocklist = { name: 'excl_buyer_blocklist', versions: [{ version: 1, domains: ['cheap-clicks.example', 'viral-feed.example'], created_at: BASE }] };
+      h.state().lists.excl_buyer_blocklist = { name: 'excl_buyer_blocklist', advertiser_id: 'adv_glowroot', pending: null, versions: [{ version: 1, domains: ['cheap-clicks.example', 'viral-feed.example'], created_at: BASE }] };
       return h;
     }
     function call(h, tok, method, path, body, query, headers) {
@@ -50,8 +50,13 @@
     }
     function match(h, body, query, tok) { return call(h, tok || 'tok_priya_adops', 'POST', '/v1/match', body, query).body; }
     function setup(r) { var h = mk(); live(h, 'seg_a', r || rule()); return h; }
-    function syncAll(h, ids) { (ids || ['edge_mum_1', 'edge_us_1', 'edge_sg_1', 'deal_tagger_1']).forEach(function (c) { var r = call(h, 'tok_admin', 'POST', '/v1/demo/consumers/' + c + '/sync'); assert.ok(r.status === 200, 'sync ' + c + ' ' + JSON.stringify(r.body)); }); }
+    var ALL = E.DEFAULT_CONSUMERS.map(function (c) { return c.id; });
+    function syncAll(h, ids) { (ids || ALL).forEach(function (c) { var r = call(h, 'tok_admin', 'POST', '/v1/demo/consumers/' + c + '/sync'); assert.ok(r.status === 200, 'sync ' + c + ' ' + JSON.stringify(r.body)); }); }
     function row(h, seg, cid) { return call(h, 'tok_priya_adops', 'GET', '/v1/segments/' + seg, null, { include: 'sync' }).body.sync.consumers.filter(function (x) { return x.consumer_id === cid; })[0]; }
+    function summary(h, seg) { return call(h, 'tok_priya_adops', 'GET', '/v1/segments/' + seg, null, { include: 'sync' }).body.sync.summary; }
+    function advance(h, sec) { var r = call(h, 'tok_admin', 'POST', '/v1/demo/advance', { seconds: sec }); assert.equal(r.status, 200); }
+    function tighten(o) { return rule(Object.assign({ must: [{ field: 'device.geo.region', in: ['IN-WB'] }, rule().must[1], rule().must[2]] }, o || {})); }
+
 
     var G1 = 'Hard-rule boundaries';
     t(G1, 'region in the list matches', function () { var m = match(setup(), req()); assert.equal(m.matches.length, 1); });
@@ -139,12 +144,12 @@
     t(G4, 'adding a region is expands_reach: high publish risk, low stale-copy risk', function () {
       var h = setup(); var v = call(h, 'tok_priya_adops', 'POST', '/v1/segments/seg_a/versions', { rule: rule({ must: [{ field: 'device.geo.region', in: ['IN-WB', 'IN-OD', 'IN-BR'] }, rule().must[1], rule().must[2]] }) }).body;
       var b = call(h, 'tok_priya_adops', 'POST', '/v1/segments/seg_a/transitions', { action: 'submit', version: v.version }).body.blast_radius;
-      assert.equal(b.new_version_change, 'expands_reach'); assert.equal(b.publish_risk, 'high'); assert.equal(b.stale_copy_behavior, 'narrower_subset'); assert.equal(b.stale_copy_risk, 'low');
+      assert.equal(b.new_version_change, 'expands_reach'); assert.equal(b.publish_risk, 'high'); assert.equal(b.old_copy_would_be, 'narrower'); assert.equal(b.stale_copy_risk, 'low');
     });
     t(G4, 'removing a region is narrows_reach: lower publish risk, high stale-copy risk', function () {
       var h = setup(); var v = call(h, 'tok_priya_adops', 'POST', '/v1/segments/seg_a/versions', { rule: rule({ must: [{ field: 'device.geo.region', in: ['IN-WB'] }, rule().must[1], rule().must[2]] }) }).body;
       var b = call(h, 'tok_priya_adops', 'POST', '/v1/segments/seg_a/transitions', { action: 'submit', version: v.version }).body.blast_radius;
-      assert.equal(b.new_version_change, 'narrows_reach'); assert.equal(b.publish_risk, 'lower'); assert.equal(b.stale_copy_behavior, 'wider_superset'); assert.equal(b.stale_copy_risk, 'high');
+      assert.equal(b.new_version_change, 'narrows_reach'); assert.equal(b.publish_risk, 'lower'); assert.equal(b.old_copy_would_be, 'wider'); assert.equal(b.stale_copy_risk, 'high');
     });
     t(G4, 'a mixed change is treated as wider (conservative)', function () {
       var h = setup(); var v = call(h, 'tok_priya_adops', 'POST', '/v1/segments/seg_a/versions', { rule: rule({ must: [{ field: 'device.geo.region', in: ['IN-WB', 'IN-OD', 'IN-BR'] }, { field: 'device.type', in: ['mobile'] }, rule().must[2]] }) }).body;
@@ -199,10 +204,16 @@
       assert.equal(a.status, 403); assert.equal(a.body.error, 'rollback_loosens_consent');
       assert.equal(call(h, 'tok_admin', 'POST', '/v1/segments/seg_a/transitions', { action: 'rollback', version: 1, reason: 'undo the tightening' }).status, 403);
     });
-    t(G5, 'a writer can pause for everyone, but still cannot approve or publish', function () {
+    t(G5, 'one person may stop a segment everywhere, because stopping only reduces delivery', function () {
       var h = setup();
-      var p = call(h, 'tok_priya_adops', 'POST', '/v1/segments/seg_a/transitions', { action: 'pause', scope: 'all', reason: 'brand safety incident' }); assert.equal(p.status, 202);
+      var p = call(h, 'tok_priya_adops', 'POST', '/v1/segments/seg_a/transitions', { action: 'pause', reason: 'brand safety incident' });
+      assert.equal(p.status, 200); assert.equal(p.body.status, 'stopped_everywhere');
       var ap = call(h, 'tok_priya_adops', 'POST', '/v1/segments/seg_a/transitions', { action: 'approve', version: 1 }); assert.equal(ap.status, 403);
+    });
+    t(G5, 'resuming a stopped segment restores reach, so it needs an approver', function () {
+      var h = setup(); call(h, 'tok_priya_adops', 'POST', '/v1/segments/seg_a/transitions', { action: 'pause', reason: 'incident' });
+      assert.equal(call(h, 'tok_priya_adops', 'POST', '/v1/segments/seg_a/transitions', { action: 'resume', reason: 'fixed' }).status, 403);
+      assert.equal(call(h, 'tok_rahul_approver', 'POST', '/v1/segments/seg_a/transitions', { action: 'resume', reason: 'fixed' }).status, 200);
     });
     t(G5, 'four-eyes: the creator cannot approve their own version, even as admin', function () {
       var h = mk(); call(h, 'tok_admin', 'POST', '/v1/segments', { segment_id: 'seg_a', name: 'a', advertiser_id: 'adv_glowroot', rule: rule() });
@@ -291,50 +302,95 @@
     t(G7, 'an ack with the wrong hash is refused', function () {
       var h = setup(); var r = call(h, 'tok_edge_us_1', 'POST', '/v1/consumers/edge_us_1/acks', { catalog_rev: 1, hash: 'deadbeef', state: 'active' }); assert.equal(r.status, 409); assert.equal(r.body.error, 'hash_mismatch');
     });
-    t(G7, 'a consumer that never acked is unknown and not counted as stale', function () {
-      var h = setup(); syncAll(h, ['edge_us_1']); var s = call(h, 'tok_priya_adops', 'GET', '/v1/segments/seg_a', null, { include: 'sync' }).body.sync;
-      assert.equal(row(h, 'seg_a', 'deal_tagger_1').state, 'unknown'); assert.equal(s.summary.ack_coverage_pct, 25); assert.equal(s.summary.stale_version_impression_share_pct, 0);
+    t(G7, 'a server that never acked is unknown and not counted as stale', function () {
+      var h = setup(); syncAll(h, ['edge_us_1']); var s1 = summary(h, 'seg_a');
+      assert.equal(row(h, 'seg_a', 'deal_tagger_1').state, 'unknown'); assert.equal(s1.ack_coverage_pct, 12.5); assert.equal(s1.stale_version_traffic_share_pct, 0);
     });
-    function widerStaleSetup() { // consumers hold v1, v2 tightens the rule, so their copy is wider
+    function widerStaleSetup() { // servers hold v1, v2 tightens the rule, so their copy is wider
       var h = setup(); syncAll(h, ['edge_us_1', 'edge_sg_1']);
-      live(h, 'seg_a', rule({ must: [{ field: 'device.geo.region', in: ['IN-WB'] }, rule().must[1], rule().must[2]] }), true); return h;
+      live(h, 'seg_a', tighten(), true); return h;
     }
-    t(G7, 'a wider stale copy is high risk and gets a pause request', function () {
-      var h = widerStaleSetup(); var r = row(h, 'seg_a', 'edge_sg_1'); assert.equal(r.classification, 'wider_superset'); assert.equal(r.risk, 'high'); assert.equal(r.recommended_action, 'request_pause');
-      var p = call(h, 'tok_rahul_approver', 'POST', '/v1/segments/seg_a/transitions', { action: 'pause', reason: 'stale wider copy' }); assert.equal(p.status, 202); assert.ok(p.body.pending.indexOf('edge_sg_1') > -1);
+    t(G7, 'a wider held copy is high risk; the hub tells the server to sync and sends no stop command', function () {
+      var h = widerStaleSetup(); var r = row(h, 'seg_a', 'edge_sg_1'); assert.equal(r.held_copy, 'wider'); assert.equal(r.risk, 'high');
+      var a = call(h, 'tok_edge_sg_1', 'POST', '/v1/consumers/edge_sg_1/acks', { catalog_rev: 1, hash: h.state().catalog[1].hash, state: 'active' });
+      assert.equal(a.body.sync_required, true); assert.equal(a.body.stale_detail[0].held_copy, 'wider');
+      assert.ok(JSON.stringify(a.body).indexOf('pause') < 0, 'the ack response carries no pause or stop command');
     });
-    t(G7, 'a stale copy that is wider on the audience gate is consent critical and recommends the kill switch', function () {
+    t(G7, 'a narrower held copy keeps serving: alert and refresh, never stop', function () {
+      var h = setup(tighten()); syncAll(h, ['edge_us_1']);
+      live(h, 'seg_a', rule(), true); var r = row(h, 'seg_a', 'edge_us_1');
+      assert.equal(r.held_copy, 'narrower'); assert.equal(r.risk, 'low'); assert.equal(r.hub_action, 'alert_p2_refresh'); assert.equal(r.on_server.status, 'keeps_serving');
+      assert.equal(r.exposure_traffic_minutes, 0);
+    });
+    t(G7, 'the head is signed, lists stopped segments, and carries a policy for each older copy', function () {
+      var h = mk(); live(h, 'seg_s', rule({ strict_compliance: true })); live(h, 'seg_s', tighten({ strict_compliance: true }), true);
+      var hd = call(h, 'tok_edge_sg_1', 'GET', '/v1/catalog/head');
+      assert.equal(hd.status, 200); assert.ok(h.verifyHead(hd.body).ok);
+      var older = hd.body.segments.seg_s.if_holding_older[0];
+      assert.equal(older.held_copy, 'wider'); assert.equal(older.on_server, 'stop_after'); assert.equal(older.after_seconds, 900);
+      assert.equal(hd.body.segments.seg_s.if_holding_unknown.on_server, 'stop_after');
+      hd.body.revoked = ['seg_s']; assert.equal(h.verifyHead(hd.body).ok, false);
+      assert.equal(call(h, 'tok_priya_adops', 'GET', '/v1/catalog/head').status, 403);
+    });
+    t(G7, 'a consent-critical held copy must stop at once', function () {
       var h = setup(); syncAll(h, ['edge_us_1', 'edge_sg_1']);
       live(h, 'seg_a', rule({ if_audience_missing: 'ineligible' }), true);
-      var r = row(h, 'seg_a', 'edge_sg_1'); assert.equal(r.risk, 'high'); assert.equal(r.consent_critical, true); assert.equal(r.recommended_action, 'kill_switch_now');
+      var hd = call(h, 'tok_edge_sg_1', 'GET', '/v1/catalog/head').body.segments.seg_a.if_holding_older[0];
+      assert.equal(hd.on_server, 'stop_now'); assert.equal(hd.after_seconds, 0);
+      call(h, 'tok_edge_sg_1', 'POST', '/v1/consumers/edge_sg_1/acks', { catalog_rev: 1, hash: h.state().catalog[1].hash, state: 'active', head_rev: 2 });
+      var r = row(h, 'seg_a', 'edge_sg_1'); assert.equal(r.consent_critical, true); assert.equal(r.on_server.action, 'stop_now');
+      assert.equal(r.hub_action, 'alert_p0_server_not_stopping', 'a server that knows and has not reported stopping is escalated');
     });
-    t(G7, 'a narrower stale copy is never paused: alert and refresh', function () {
-      var h = setup(rule({ must: [{ field: 'device.geo.region', in: ['IN-WB'] }, rule().must[1], rule().must[2]] })); syncAll(h, ['edge_us_1']);
-      live(h, 'seg_a', rule(), true); var r = row(h, 'seg_a', 'edge_us_1'); assert.equal(r.classification, 'narrower_subset'); assert.equal(r.risk, 'low'); assert.equal(r.recommended_action, 'alert_p2_and_refresh');
-      var p = call(h, 'tok_rahul_approver', 'POST', '/v1/segments/seg_a/transitions', { action: 'pause', reason: 'try to pause' }); assert.equal(p.status, 200); assert.equal(p.body.status, 'no_pause_needed'); assert.equal(p.body.skipped.length, 1);
+    function failingStrict() {
+      var h = mk({ autoEdges: true }); live(h, 'seg_s', rule({ strict_compliance: true }));
+      call(h, 'tok_admin', 'POST', '/v1/demo/consumers/edge_sg_1/mode', { mode: 'failing' });
+      live(h, 'seg_s', tighten({ strict_compliance: true }), true); return h;
+    }
+    t(G7, 'a server whose reload fails stops a strict wider copy on its own deadline', function () {
+      var h = failingStrict(), r0 = row(h, 'seg_s', 'edge_sg_1');
+      assert.equal(r0.state, 'confirmed_stale'); assert.equal(r0.received_rev, 2); assert.equal(r0.held_rev, 1); assert.equal(r0.exceptions[0].error, 'apply_failed');
+      assert.equal(r0.on_server.status, 'will_stop'); assert.equal(r0.on_server.seconds_left, 900); assert.equal(r0.hub_action, 'alert_p1_server_stops_at_deadline');
+      assert.equal(row(h, 'seg_s', 'edge_sg_2').state, 'in_sync', 'healthy servers apply at once');
+      advance(h, 901); var r1 = row(h, 'seg_s', 'edge_sg_1');
+      assert.equal(r1.on_server.status, 'stopped'); assert.equal(r1.on_server.confirmed, true); assert.equal(r1.on_server.reason, 'deadline_passed'); assert.equal(r1.serving_wider_copy, false);
+      var e1 = summary(h, 'seg_s').high_risk_stale_exposure_traffic_minutes; advance(h, 3600);
+      assert.equal(summary(h, 'seg_s').high_risk_stale_exposure_traffic_minutes, e1, 'exposure stops growing once the server stops the segment');
     });
-    t(G7, 'a pause is confirmed only when the consumer acks it', function () {
-      var h = widerStaleSetup(); call(h, 'tok_rahul_approver', 'POST', '/v1/segments/seg_a/transitions', { action: 'pause', reason: 'stale wider copy' });
-      assert.equal(row(h, 'seg_a', 'edge_sg_1').pause, 'requested'); syncAll(h, ['edge_sg_1']); assert.equal(row(h, 'seg_a', 'edge_sg_1').pause, 'confirmed');
+    t(G7, 'stopping a segment everywhere reaches a server whose reload is failing', function () {
+      var h = failingStrict();
+      call(h, 'tok_priya_adops', 'POST', '/v1/segments/seg_s/transitions', { action: 'pause', reason: 'client escalation' });
+      var r = row(h, 'seg_s', 'edge_sg_1'); assert.equal(r.on_server.status, 'stopped'); assert.equal(r.on_server.reason, 'revoked');
     });
-    t(G7, 'an unreachable consumer with a wider copy needs the kill switch, not just a pause request', function () {
-      var h = widerStaleSetup(); call(h, 'tok_admin', 'POST', '/v1/demo/consumers/edge_sg_1/unreachable', { value: true });
-      var r = row(h, 'seg_a', 'edge_sg_1'); assert.equal(r.state, 'unknown'); assert.equal(r.recommended_action, 'kill_switch_then_expiry');
-      var p = call(h, 'tok_rahul_approver', 'POST', '/v1/segments/seg_a/transitions', { action: 'pause', reason: 'consumer wedged' }); assert.ok(p.body.unreachable.indexOf('edge_sg_1') > -1); assert.ok(p.body.backstop.indexOf('kill switch') > -1);
+    t(G7, 'a server cut off from everything stops strict segments by lease; standard ones keep their last copy', function () {
+      var h = mk({ autoEdges: true }); live(h, 'seg_s', rule({ strict_compliance: true })); live(h, 'seg_a', rule());
+      call(h, 'tok_admin', 'POST', '/v1/demo/consumers/edge_us_1/unreachable', { value: true });
+      var r0 = row(h, 'seg_s', 'edge_us_1'); assert.equal(r0.state, 'unknown'); assert.equal(r0.on_server.status, 'stops_by_lease');
+      advance(h, 901);
+      assert.equal(row(h, 'seg_s', 'edge_us_1').on_server.status, 'expected_stopped');
+      assert.equal(row(h, 'seg_a', 'edge_us_1').on_server.action, 'keeps_last_copy');
+      assert.equal(row(h, 'seg_s', 'edge_us_2').state, 'in_sync', 'servers that can read the head renew their lease');
     });
-    t(G7, 'local expiry counts down, then follows the segment policy', function () {
-      var h = widerStaleSetup(); var r0 = row(h, 'seg_a', 'edge_sg_1'); assert.equal(r0.seconds_until_local_expiry, 14400); assert.equal(r0.local_expiry_outcome, null);
-      call(h, 'tok_admin', 'POST', '/v1/demo/advance', { seconds: 14401 }); var r1 = row(h, 'seg_a', 'edge_sg_1'); assert.ok(r1.seconds_until_local_expiry <= 0); assert.equal(r1.local_expiry_outcome, 'degrade_to_context_only');
+    t(G7, 'a hub API outage stops nothing that was correct', function () {
+      var h = mk({ autoEdges: true }); live(h, 'seg_s', rule({ strict_compliance: true }));
+      var o = call(h, 'tok_admin', 'POST', '/v1/demo/hub-outage', { minutes: 20 });
+      assert.equal(o.status, 200); assert.equal(o.body.strict_copies_stopped_by_lease, 0); assert.ok(o.body.strict_copies_that_would_stop_if_the_lease_counted_from_the_hub_api > 0);
+      var s1 = summary(h, 'seg_s'); assert.equal(s1.stopped_locally, 0); assert.equal(row(h, 'seg_s', 'edge_sg_1').state, 'in_sync');
     });
-    t(G7, 'strict_compliance segments expire in minutes and fail closed', function () {
-      var h = mk(); live(h, 'seg_s', rule({ strict_compliance: true })); syncAll(h, ['edge_sg_1']);
-      live(h, 'seg_s', rule({ strict_compliance: true, must: [{ field: 'device.geo.region', in: ['IN-WB'] }, rule().must[1], rule().must[2]] }), true);
-      var r = row(h, 'seg_s', 'edge_sg_1'); assert.equal(r.expiry_class, 'strict'); assert.equal(r.seconds_until_local_expiry, 900);
-      call(h, 'tok_admin', 'POST', '/v1/demo/advance', { seconds: 901 }); assert.equal(row(h, 'seg_s', 'edge_sg_1').local_expiry_outcome, 'fail_closed');
+    t(G7, 'while the hub API is down it answers 503, and the head stays readable from object storage', function () {
+      var h = setup(); h.state().hubDown = true;
+      assert.equal(call(h, 'tok_priya_adops', 'GET', '/v1/segments/seg_a').status, 503);
+      var o = h.handle({ method: 'GET', path: '/v1/catalog/objects/head.json', headers: {} }); assert.equal(o.status, 200); assert.ok(h.verifyHead(o.body).ok);
+      h.state().hubDown = false;
+    });
+    t(G7, 'one stale instance in a healthy cluster is visible; one report per cluster would hide it', function () {
+      var h = setup(); syncAll(h, ['edge_sg_1', 'edge_sg_2', 'edge_sg_3']); live(h, 'seg_a', tighten(), true); syncAll(h, ['edge_sg_2', 'edge_sg_3']);
+      var sg = summary(h, 'seg_a').clusters.filter(function (c) { return c.cluster === 'singapore'; })[0];
+      assert.equal(sg.instances, 3); assert.equal(sg.in_sync, 2); assert.equal(sg.stale, 1);
+      assert.equal(sg.one_report_per_cluster_would_say, 'in sync'); assert.equal(sg.hides_a_problem, true);
     });
     t(G7, 'an exclusion-list update marks an old-revision consumer as a wider stale copy', function () {
       var h = setup(); syncAll(h, ['edge_sg_1', 'edge_us_1']); call(h, 'tok_admin', 'POST', '/v1/demo/lists/excl_buyer_blocklist/domains', { domain: 'glow-deals-feed.example' }); syncAll(h, ['edge_us_1']);
-      var r = row(h, 'seg_a', 'edge_sg_1'); assert.equal(r.classification, 'wider_superset'); assert.equal(r.risk, 'high'); assert.equal(row(h, 'seg_a', 'edge_us_1').state, 'in_sync');
+      var r = row(h, 'seg_a', 'edge_sg_1'); assert.equal(r.held_copy, 'wider'); assert.equal(r.risk, 'high'); assert.equal(row(h, 'seg_a', 'edge_us_1').state, 'in_sync');
       var site = req(function (x) { x.site.domain = 'glow-deals-feed.example'; });
       var m = match(h, site, { catalog_rev: 1, compare: 'active' }); assert.equal(m.matches.length, 1); assert.equal(m.compare.diverges, true); assert.equal(m.compare.active.matches.length, 0);
     });
@@ -356,8 +412,12 @@
     t(G7, 'the seeded demo tells the GlowRoot story', function () {
       var h = E.createHub({ now: function () { return BASE; }, seed: true });
       var f = function (s, c) { return call(h, 'tok_priya_adops', 'GET', '/v1/segments/' + s, null, { include: 'sync' }).body.sync.consumers.filter(function (x) { return x.consumer_id === c; })[0]; };
-      assert.equal(f('seg_glowroot_festive_east', 'edge_mum_1').risk, 'low'); assert.equal(f('seg_glowroot_festive_east', 'edge_mum_1').classification, 'narrower_subset');
-      assert.equal(f('seg_glowroot_premium_north', 'edge_sg_1').classification, 'wider_superset'); assert.equal(f('seg_glowroot_festive_east', 'edge_us_1').state, 'in_sync'); assert.equal(f('seg_glowroot_festive_east', 'deal_tagger_1').state, 'unknown');
+      assert.equal(f('seg_glowroot_festive_east', 'edge_mum_1').risk, 'low'); assert.equal(f('seg_glowroot_festive_east', 'edge_mum_1').held_copy, 'narrower');
+      var sg1 = f('seg_glowroot_premium_north', 'edge_sg_1');
+      assert.equal(sg1.held_copy, 'wider'); assert.equal(sg1.on_server.status, 'will_stop'); assert.equal(sg1.exceptions[0].error, 'apply_failed');
+      assert.equal(f('seg_glowroot_premium_north', 'edge_sg_2').state, 'in_sync'); assert.equal(f('seg_glowroot_festive_east', 'edge_us_1').state, 'in_sync'); assert.equal(f('seg_glowroot_festive_east', 'deal_tagger_1').state, 'unknown');
+      var sm = call(h, 'tok_priya_adops', 'GET', '/v1/segments/seg_glowroot_premium_north', null, { include: 'sync' }).body.sync.summary;
+      assert.equal(sm.clusters.filter(function (c) { return c.cluster === 'singapore'; })[0].hides_a_problem, true);
     });
 
     var G8 = 'Reach estimate and stale exposure';
@@ -390,18 +450,57 @@
       var h = setup(); syncAll(h, ['edge_us_1']);
       live(h, 'seg_a', rule({ must: [{ field: 'device.geo.region', in: ['IN-WB', 'IN-OD', 'IN-KA'] }, rule().must[1], rule().must[2]] }), true);
       var r = row(h, 'seg_a', 'edge_us_1');
-      assert.equal(r.classification, 'narrower_subset'); assert.ok(r.summary.indexOf('what the active version has that this copy lacks') > -1 || r.summary.indexOf('What the active version has that this copy lacks') > -1);
+      assert.equal(r.held_copy, 'narrower'); assert.ok(r.summary.indexOf('what the active version has that this copy lacks') > -1 || r.summary.indexOf('What the active version has that this copy lacks') > -1);
     });
-    t(G8, 'stale exposure accrues as traffic share times minutes behind, from acknowledgements alone', function () {
+    t(G8, 'exposure is a running total: traffic share times minutes a wider copy stayed live past the propagation window', function () {
       var h = widerStaleSetup();
-      var s0 = call(h, 'tok_priya_adops', 'GET', '/v1/segments/seg_a', null, { include: 'sync' }).body.sync.summary;
-      assert.equal(s0.high_risk_stale_exposure_traffic_minutes, 0);
-      call(h, 'tok_admin', 'POST', '/v1/demo/advance', { seconds: 3600 });
-      var s1 = call(h, 'tok_priya_adops', 'GET', '/v1/segments/seg_a', null, { include: 'sync' }).body.sync.summary;
-      assert.ok(Math.abs(s1.high_risk_stale_exposure_traffic_minutes - (0.38 + 0.30) * 60) < 0.5, String(s1.high_risk_stale_exposure_traffic_minutes));
+      assert.equal(summary(h, 'seg_a').high_risk_stale_exposure_traffic_minutes, 0);
+      advance(h, 3600);
+      var grace = E.PROPAGATION_GRACE_SECONDS / 60, want = (0.19 + 0.10) * (60 - grace);
+      var s1 = summary(h, 'seg_a'); assert.ok(Math.abs(s1.high_risk_stale_exposure_traffic_minutes - want) < 0.3, String(s1.high_risk_stale_exposure_traffic_minutes)); assert.equal(s1.exposure_still_growing, true);
       syncAll(h, ['edge_us_1', 'edge_sg_1']);
-      var s2 = call(h, 'tok_priya_adops', 'GET', '/v1/segments/seg_a', null, { include: 'sync' }).body.sync.summary;
-      assert.equal(s2.high_risk_stale_exposure_traffic_minutes, 0);
+      var s2 = summary(h, 'seg_a'); assert.ok(Math.abs(s2.high_risk_stale_exposure_traffic_minutes - want) < 0.3, 'the total keeps what was closed'); assert.equal(s2.exposure_still_growing, false);
+      advance(h, 3600); assert.equal(summary(h, 'seg_a').high_risk_stale_exposure_traffic_minutes, s2.high_risk_stale_exposure_traffic_minutes);
+    });
+    t(G8, 'a copy behind for less than the propagation window adds no exposure', function () {
+      var h = widerStaleSetup(); advance(h, E.PROPAGATION_GRACE_SECONDS - 10); assert.equal(summary(h, 'seg_a').high_risk_stale_exposure_traffic_minutes, 0);
+    });
+
+    var G9 = 'Exclusion lists and deal bindings';
+    function listCall(h, tok, path, body) { return call(h, tok, 'POST', '/v1/lists/excl_buyer_blocklist' + path, body); }
+    t(G9, 'adding a site narrows reach, so one person publishes it with a reason', function () {
+      var h = setup(); var r = listCall(h, 'tok_priya_adops', '/versions', { add: ['new-spam.example'], reason: 'buyer request' });
+      assert.equal(r.status, 201); assert.equal(r.body.status, 'active'); assert.equal(r.body.version, 2); assert.equal(r.body.affected_segments.length, 1);
+      assert.equal(listCall(h, 'tok_priya_adops', '/versions', { add: ['x-spam.example'] }).status, 400, 'a reason is required');
+    });
+    t(G9, 'removing a site widens reach, so it waits for an approver who did not propose it', function () {
+      var h = setup(); var r = listCall(h, 'tok_priya_adops', '/versions', { remove: ['viral-feed.example'], reason: 'buyer unblocked it' });
+      assert.equal(r.status, 202); assert.equal(r.body.status, 'waiting_for_approval');
+      assert.equal(call(h, 'tok_priya_adops', 'GET', '/v1/lists/excl_buyer_blocklist').body.version, 1, 'nothing changes before approval');
+      assert.equal(listCall(h, 'tok_priya_adops', '/transitions', { action: 'approve' }).status, 403);
+      var a = listCall(h, 'tok_rahul_approver', '/transitions', { action: 'approve' }); assert.equal(a.status, 200); assert.equal(a.body.version, 2);
+      var l = call(h, 'tok_priya_adops', 'GET', '/v1/lists/excl_buyer_blocklist').body; assert.ok(l.domains.indexOf('viral-feed.example') < 0); assert.equal(l.versions[1].approved_by, 'rahul');
+    });
+    t(G9, 'four-eyes on lists: the proposer cannot approve, even as admin', function () {
+      var h = setup(); listCall(h, 'tok_admin', '/versions', { remove: ['viral-feed.example'], reason: 'test' });
+      var a = listCall(h, 'tok_admin', '/transitions', { action: 'approve' }); assert.equal(a.status, 403); assert.equal(a.body.error, 'four_eyes_violation');
+    });
+    t(G9, "another advertiser cannot see or change the list", function () {
+      var h = setup(); assert.equal(call(h, 'tok_other_writer', 'GET', '/v1/lists/excl_buyer_blocklist').status, 404);
+      assert.equal(listCall(h, 'tok_other_writer', '/versions', { add: ['a-site.example'], reason: 'test' }).status, 404);
+    });
+    t(G9, 'deal IDs travel with the segment into the catalog and the match result', function () {
+      var h = mk(); var c = call(h, 'tok_priya_adops', 'POST', '/v1/segments', { segment_id: 'seg_d', name: 'd', advertiser_id: 'adv_glowroot', rule: rule(), deal_ids: ['MN-DEAL-1'] });
+      assert.equal(c.status, 201); live(h, 'seg_d', rule(), true);
+      var snap = call(h, 'tok_edge_us_1', 'GET', '/v1/catalog/snapshot', null, { since_rev: 0 }).body; assert.deepEqual(snap.segments[0].deal_ids, ['MN-DEAL-1'], 'a new version keeps the deal binding');
+      assert.deepEqual(match(h, req()).matches[0].deal_ids, ['MN-DEAL-1']);
+      assert.equal(call(h, 'tok_priya_adops', 'POST', '/v1/segments', { name: 'bad', advertiser_id: 'adv_glowroot', rule: rule(), deal_ids: ['not a deal id'] }).status, 400);
+    });
+    t(G9, 'attaching a deal widens reach and detaching one narrows it', function () {
+      var h = mk(); call(h, 'tok_priya_adops', 'POST', '/v1/segments', { segment_id: 'seg_d', name: 'd', advertiser_id: 'adv_glowroot', rule: rule(), deal_ids: ['MN-DEAL-1'] }); live(h, 'seg_d', rule(), true);
+      function radius(deals) { var v = call(h, 'tok_priya_adops', 'POST', '/v1/segments/seg_d/versions', { rule: rule(), deal_ids: deals }).body; return call(h, 'tok_priya_adops', 'POST', '/v1/segments/seg_d/transitions', { action: 'submit', version: v.version }).body.blast_radius; }
+      assert.equal(radius(['MN-DEAL-1', 'MN-DEAL-2']).new_version_change, 'expands_reach');
+      assert.equal(radius([]).new_version_change, 'narrows_reach');
     });
 
     return tests;

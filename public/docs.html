@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Segment Hub API reference</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#1b2430;--mut:#5d6b7c;--line:#dfe3e8;--acc:#1f5eff;--code:#f0f2f5;--ok:#14803c;--ok-bg:#e3f5e9;--warn:#946200;--warn-bg:#fff3d6;--bad:#b3261e;--bad-bg:#fde7e5;--info:#1f5eff;--info-bg:#e6edff}
+@media (prefers-color-scheme:dark){:root{--bg:#12161c;--card:#1a2029;--ink:#e6eaf0;--mut:#9aa7b8;--line:#2b3441;--acc:#6b95ff;--code:#222a35;--ok:#59d68a;--ok-bg:#16301f;--warn:#f0c15a;--warn-bg:#3a2e12;--bad:#ff8c84;--bad-bg:#3b1a18;--info:#8fb0ff;--info-bg:#1b2742}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{padding:16px 20px;border-bottom:1px solid var(--line);background:var(--card)}
+.wrap{max-width:1100px;margin:0 auto;padding:18px 20px 60px}
+.top{display:flex;gap:16px;align-items:center;justify-content:space-between}
+h1{font-size:20px;margin:0}h2{font-size:16px;margin:26px 0 8px}h3{font-size:15px;margin:0}
+.muted{color:var(--mut)}.small{font-size:13px}
+a{color:var(--acc)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:0 0 12px}
+.m{display:inline-block;min-width:52px;text-align:center;padding:2px 8px;border-radius:6px;font:700 12px ui-monospace,Menlo,Consolas,monospace;margin-right:8px}
+.GET{background:var(--info-bg);color:var(--info)}.POST{background:var(--ok-bg);color:var(--ok)}
+.path{font:600 14px ui-monospace,Menlo,Consolas,monospace}
+.chip{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600;margin-right:6px}
+.s2{background:var(--ok-bg);color:var(--ok)}.s3{background:var(--info-bg);color:var(--info)}.s4,.s5{background:var(--bad-bg);color:var(--bad)}
+pre{background:var(--code);border-radius:8px;padding:10px;overflow:auto;font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;max-height:380px;margin:6px 0}
+details>summary{cursor:pointer;color:var(--mut);font-size:13px;margin:6px 0}
+table{border-collapse:collapse;width:100%;font-size:13.5px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--mut);font-size:12px}
+.chroma img{width:64px;height:64px;display:block}
+@media (prefers-reduced-motion:no-preference){.chroma img{animation:in .35s ease-out both}@keyframes in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}}
+@media(max-width:640px){.chroma{display:none}}
+</style>
+</head>
+<body>
+<header><div class="top" style="max-width:1100px;margin:0 auto">
+  <div><h1>Segment Hub API reference</h1><div class="muted small">Every example below is a real response from a freshly seeded hub, generated from the code by <code>build-openapi.js</code>. Machine-readable: <a href="openapi.json">openapi.json</a>. Try it live: <a href="/">the prototype</a>.</div></div>
+  <figure class="chroma" style="margin:0"><img src="assets/chroma/reading_docs.webp" alt="Chroma, the Segment Hub mascot, reading a book" onerror="this.parentNode.style.display='none'"></figure>
+</div></header>
+<div class="wrap" id="root"><p class="muted">Loading the contract...</p></div>
+<script>
+(function () {
+  'use strict';
+  function el(tag, attrs) {
+    var e = document.createElement(tag), kids = Array.prototype.slice.call(arguments, 2);
+    Object.keys(attrs || {}).forEach(function (k) { if (k === 'class') e.className = attrs[k]; else e.setAttribute(k, attrs[k]); });
+    kids.forEach(function add(c) { if (Array.isArray(c)) return c.forEach(add); if (c == null || c === false) return; e.append(c.nodeType ? c : document.createTextNode(String(c))); });
+    return e;
+  }
+  function pre(v) { return el('pre', {}, JSON.stringify(v, null, 2)); }
+  var ORDER = ['Author', 'Approve', 'Distribute', 'Observe', 'Test'];
+  fetch('openapi.json').then(function (r) { return r.json(); }).then(function (spec) {
+    var root = document.getElementById('root'); root.innerHTML = '';
+    root.append(el('div', { class: 'card' }, el('p', { style: 'margin:0' }, spec.info.description),
+      el('p', { class: 'small muted', style: 'margin:8px 0 0' }, 'Auth: ', spec.components.securitySchemes.bearer.description)));
+    var ops = [];
+    Object.keys(spec.paths).forEach(function (p) { Object.keys(spec.paths[p]).forEach(function (m) { ops.push({ path: p, method: m.toUpperCase(), op: spec.paths[p][m] }); }); });
+    ORDER.forEach(function (tag) {
+      var list = ops.filter(function (o) { return o.op.tags[0] === tag; });
+      if (!list.length) return;
+      root.append(el('h2', {}, tag));
+      list.forEach(function (o) {
+        var card = el('div', { class: 'card' },
+          el('div', {}, el('span', { class: 'm ' + o.method }, o.method), el('span', { class: 'path' }, o.path)),
+          el('h3', { style: 'margin-top:8px' }, o.op.summary),
+          el('div', { class: 'small' }, o.op.description),
+          el('div', { class: 'small muted', style: 'margin-top:4px' }, 'Who calls it: ' + o.op['x-who-calls']));
+        if (o.op.parameters) card.append(el('div', { class: 'small muted' }, 'Parameters: ' + o.op.parameters.map(function (p) { return p.name + ' (' + p.in + ')'; }).join(', ')));
+        if (o.op.requestBody) card.append(el('details', { open: '' }, el('summary', {}, 'Request body'), pre(o.op.requestBody.content['application/json'].example)));
+        Object.keys(o.op.responses).forEach(function (code, i) {
+          var r = o.op.responses[code];
+          card.append(el('details', i === 0 ? { open: '' } : {}, el('summary', {}, el('span', { class: 'chip s' + code[0] }, code), r.description), pre(r.content['application/json'].example)));
+        });
+        root.append(card);
+      });
+    });
+    var errs = spec['x-errors'];
+    root.append(el('h2', {}, 'Errors'), el('div', { class: 'card' }, el('div', { class: 'small' }, 'Every error has the same shape: '), pre(errs.format),
+      el('table', {}, el('tr', {}, el('th', {}, 'Status'), el('th', {}, 'Meaning')), Object.keys(errs.codes).map(function (c) { return el('tr', {}, el('td', {}, c), el('td', {}, errs.codes[c])); }))));
+  }).catch(function (e) { document.getElementById('root').textContent = 'Could not load openapi.json: ' + e.message; });
+})();
+</script>
+</body>
+</html>

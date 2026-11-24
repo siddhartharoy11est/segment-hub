@@ -65,6 +65,29 @@ body.logopen main{padding-bottom:56vh}
 .exguide dl{margin:0;display:grid;grid-template-columns:110px 1fr;gap:6px 12px;font-size:13.5px}
 .exguide dt{color:var(--mut);font-weight:600;font-size:12.5px}
 .exguide dd{margin:0}
+/* Chroma: Segment Hub's mascot. Static art, transform-only motion, no motion at all when the reader asks for less. */
+.chroma{display:inline-flex;align-items:center;gap:10px;margin:0;flex:none}
+.chroma img{display:block;object-fit:contain;user-select:none;-webkit-user-drag:none}
+.chroma.xs img{width:36px;height:36px}.chroma.sm img{width:60px;height:60px}.chroma.md img{width:104px;height:104px}
+.chroma figcaption{font-size:13px;color:var(--mut);font-style:italic;max-width:240px;line-height:1.35}
+.chroma.enter img{animation:chroma-in .3s ease-out both}
+.chroma.enter.float img{animation:chroma-in .3s ease-out both,chroma-float 3.6s ease-in-out .3s 2}
+.chroma.enter.rock img{animation:chroma-in .3s ease-out both,chroma-rock 1.6s ease-in-out .3s 2}
+.chroma.enter.pop img{animation:chroma-pop .5s cubic-bezier(.2,1.5,.4,1) both}
+.chroma.enter.bounce img{animation:chroma-pop .45s ease-out both,chroma-hop .5s ease-out .45s 1}
+.chroma.click img{cursor:pointer;transition:transform .18s ease}
+.chroma.click img:hover,.chroma.click img:focus-visible{transform:rotate(-5deg) scale(1.05);outline:none}
+@keyframes chroma-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@keyframes chroma-float{50%{transform:translateY(-4px)}}
+@keyframes chroma-rock{25%{transform:rotate(-3deg)}75%{transform:rotate(3deg)}}
+@keyframes chroma-pop{from{opacity:0;transform:scale(.75)}to{opacity:1;transform:none}}
+@keyframes chroma-hop{40%{transform:translateY(-6px)}}
+@media (prefers-reduced-motion:reduce){.chroma img{animation:none!important;transition:none!important}}
+.headrow{display:flex;gap:16px;align-items:center;justify-content:space-between}
+.headrow>div:first-child{flex:1;min-width:0}
+.toast .row{flex-wrap:nowrap}
+@media(max-width:640px){.chroma.md img{width:64px;height:64px}.chroma figcaption{display:none}}
+.ctlrow{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}.ctlrow button{padding:1px 7px;font-size:11.5px;white-space:nowrap}
 @media(max-width:640px){.exwrap{grid-template-columns:1fr}.exguide dl{grid-template-columns:1fr}.exguide dd{margin-bottom:6px}.two{grid-template-columns:1fr}header{padding:12px}main{padding:14px 12px 90px}}
 </style>
 </head>
@@ -78,6 +101,7 @@ body.logopen main{padding-bottom:56vh}
     <span id="mode" class="chip grey">connecting</span>
     <label>Acting as <select id="actor"></select></label>
     <span class="muted" id="clock"></span>
+    <a href="docs" class="small" style="color:var(--acc)">API docs</a>
     <button id="reset" class="sm">Reset demo</button>
   </div>
 </header>
@@ -92,7 +116,7 @@ body.logopen main{padding-bottom:56vh}
 (function () {
   'use strict';
   var MODE = 'sim', hub = null, WAKE_READY = false;
-  var state = { tab: 'about', about: {}, token: 'tok_priya_adops', replay: null, segId: null, sync: null, syncSeg: 'seg_glowroot_festive_east', dstate: null, radius: null, scen: {}, builder: '', tests: null, explorer: null, logOpen: false, logSel: null };
+  var state = { tab: 'about', about: {}, token: 'tok_priya_adops', replay: null, segId: null, sync: null, syncSeg: 'seg_glowroot_premium_north', dstate: null, radius: null, scen: {}, builder: '', tests: null, explorer: null, logOpen: false, logSel: null };
   var LOG = [];
 
   // ---------------------------------------------------------------- helpers
@@ -117,9 +141,48 @@ body.logopen main{padding-bottom:56vh}
     var hh = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), ss = s % 60;
     return hh ? hh + 'h ' + mm + 'm' : mm ? mm + 'm ' + (ss < 10 ? '0' : '') + ss + 's' : ss + 's';
   }
+  // ---------------------------------------------------------------- Chroma, the mascot
+  // One registry maps each application state to an illustration. Every placement passes a state the page has
+  // actually observed; Chroma never invents a status, and the precise text always sits next to it.
+  var CHROMA = {
+    welcome: { file: 'hero_laptop', alt: 'Chroma the chameleon, at a laptop', anim: 'float' },
+    mismatch: { file: 'warning', alt: 'Chroma looking concerned', anim: 'rock' },
+    investigating: { file: 'analyze', alt: 'Chroma looking through a magnifying glass', anim: 'pop' },
+    contained: { file: 'monitor', alt: 'Chroma watching a monitor', anim: 'pop' },
+    updating: { file: 'updating', alt: 'Chroma waiting for an update to apply', anim: 'pop' },
+    synced: { file: 'synced_success', alt: 'Chroma smiling beside a check mark', anim: 'pop' },
+    invalid: { file: 'conflict_error', alt: 'Chroma looking concerned beside an alert', anim: 'rock' },
+    validated: { file: 'validate', alt: 'Chroma holding a checked clipboard', anim: 'bounce' },
+    second_look: { file: 'thinking', alt: 'Chroma thinking', anim: 'pop' },
+    shipped: { file: 'deploy', alt: 'Chroma beside a small rocket', anim: 'bounce' },
+    empty: { file: 'empty_no_data', alt: 'Chroma beside an empty box', anim: 'float' },
+    error: { file: 'something_went_wrong', alt: 'Chroma under a small rain cloud', anim: 'pop' },
+    maintenance: { file: 'maintenance', alt: 'Chroma in a hard hat, holding a wrench', anim: 'pop' },
+    docs: { file: 'reading_docs', alt: 'Chroma reading a book', anim: 'float' },
+    thinking: { file: 'thinking', alt: 'Chroma thinking' }, idea: { file: 'idea', alt: 'Chroma with an idea' },
+    happy: { file: 'happy', alt: 'Chroma smiling' }, relaxed: { file: 'relaxed', alt: 'Chroma relaxing' }, focused: { file: 'focused', alt: 'Chroma focused on a laptop' }
+  };
+  var CHROMA_ON = true; // set to false to remove Chroma everywhere; every placement already copes with null
+  var CH_LAST = {};
+  function chroma(slot, key, o) {
+    o = o || {}; var art = CHROMA[key]; if (!art || !CHROMA_ON) return null;
+    var changed = CH_LAST[slot] !== key + '|' + (o.line || ''); CH_LAST[slot] = key + '|' + (o.line || '');
+    var fig = h('figure', { class: 'chroma ' + (o.size || 'sm') + (changed ? ' enter ' + (o.anim || art.anim || '') : '') + (o.onclick ? ' click' : '') });
+    var img = h('img', { src: 'assets/chroma/' + art.file + '.webp', alt: o.onclick ? art.alt + '. Click for another expression' : art.alt, decoding: 'async', draggable: 'false' });
+    img.addEventListener('error', function () { fig.style.display = 'none'; });
+    if (o.onclick) {
+      img.setAttribute('role', 'button'); img.tabIndex = 0;
+      img.addEventListener('click', o.onclick);
+      img.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); o.onclick(); } });
+    }
+    fig.append(img); if (o.line) fig.append(h('figcaption', {}, o.line));
+    return fig;
+  }
+  // A small discoverable extra on the Story tab: click Chroma before starting the replay.
+  var EGG = [['welcome', null], ['thinking', 'Context is everything.'], ['idea', 'Friends don\'t let friends deploy unvalidated rules.'], ['happy', 'Same version, same vision.'], ['relaxed', 'My favourite colour? Depends on the context.'], ['focused', 'I\'m a chameleon, not a cache invalidation strategy.']];
   function uid() { return 'ui-' + Math.random().toString(36).slice(2, 10); }
-  function toast(msg, tone) {
-    var t = h('div', { class: 'toast ' + (tone === 'bad' ? 'bad' : tone === 'good' ? 'good' : 'info') }, msg);
+  function toast(msg, tone, mascot) {
+    var t = h('div', { class: 'toast ' + (tone === 'bad' ? 'bad' : tone === 'good' ? 'good' : 'info') }, mascot ? h('div', { class: 'row' }, chroma('toast' + Math.random(), mascot, { size: 'xs' }), h('span', {}, msg)) : msg);
     document.body.append(t); setTimeout(function () { t.remove(); }, tone === 'bad' ? 7000 : 3800);
   }
   function actorLabel(tok) { var t = (state.dstate ? state.dstate.tokens : []).filter(function (x) { return x.token === tok; })[0]; return t ? t.label : tok; }
@@ -219,19 +282,19 @@ body.logopen main{padding-bottom:56vh}
       body: bid(function (r) { r.id = 'req-s3'; r.site.domain = 'cheap-clicks.example'; }),
       facts: ['Kolkata (IN-WB)', 'mobile', 'consent granted', 'site cheap-clicks.example (on excl_buyer_blocklist)'],
       verdict: function (b) { var e = find(b.excluded, 'seg_glowroot_festive_east'); return e ? { tone: 'bad', head: 'EXCLUDED', text: e.reason } : { tone: 'bad', head: 'Unexpected', text: 'The site should have been excluded.' }; } },
-    { n: 4, title: 'Mumbai edge cluster still on an older rule (narrower copy)', shows: 'Stale copy that under-delivers. No pause: alert and refresh', seg: 'seg_glowroot_festive_east', query: { catalog_rev: 4, compare: 'active' },
+    { n: 4, title: 'Both Mumbai servers still on an older rule (narrower copy)', shows: 'A stale copy that under-delivers. It keeps serving: alert and refresh, never stop', seg: 'seg_glowroot_festive_east', query: { catalog_rev: 4, compare: 'active' },
       body: bid(function (r) { r.id = 'req-s4'; r.device.geo.region = 'IN-OD'; }),
-      facts: ['Bhubaneswar (IN-OD)', 'mobile', 'consent granted', 'replayed against catalog rev 4, what the Mumbai cluster holds'],
+      facts: ['Bhubaneswar (IN-OD)', 'mobile', 'consent granted', 'replayed against catalog rev 4, what both Mumbai servers hold'],
       verdict: function (b) {
         var d = b.compare && find(b.compare.differences, 'seg_glowroot_festive_east');
-        return d ? { tone: 'warn', head: 'DIVERGES: the stale copy rejects what the active version accepts', text: 'The Mumbai cluster holds segment v2 (West Bengal only). The active v3 adds Odisha, so this request is ' + d.held + ' on the stale copy and ' + d.active + ' on the active one. The stale copy is narrower: it under-delivers but does not leak. Policy: never pause it. Raise a P2 alert and force a refresh.' } : { tone: 'bad', head: 'No divergence', text: 'Unexpected. Reset the demo.' };
+        return d ? { tone: 'warn', head: 'DIVERGES: the stale copy refuses what the active version accepts', text: 'The Mumbai servers hold segment v2 (West Bengal only). The active v3 adds Odisha, so this request is ' + d.held + ' on the held copy and ' + d.active + ' on the active one. The held copy is narrower: it under-delivers but cannot reach traffic the client excluded. Policy: keep serving, raise a P2 alert and refresh. Never stop it, because stopping would throw away valid delivery.' } : { tone: 'bad', head: 'No divergence', text: 'Unexpected. Reset the demo.' };
       }, link: ['sync', 'seg_glowroot_festive_east', 'See it on the sync board'] },
-    { n: 5, title: 'Singapore edge cluster missed an exclusion-list update (wider copy)', shows: 'Stale copy that leaks. High risk: pause request, countdown, kill switch', seg: 'seg_glowroot_premium_north', query: { catalog_rev: 3, compare: 'active' },
+    { n: 5, title: 'One Singapore server missed an exclusion-list update (wider copy)', shows: 'A stale copy that can make the deal eligible on an excluded site. The server stops it at its own deadline', seg: 'seg_glowroot_premium_north', query: { catalog_rev: 3, compare: 'active' },
       body: bid(function (r) { r.id = 'req-s5'; r.device.geo.region = 'IN-DL'; r.site.domain = 'glow-deals-feed.example'; }),
-      facts: ['Delhi (IN-DL)', 'mobile', 'consent granted', 'site glow-deals-feed.example, added to excl_buyer_blocklist in rev 4', 'replayed against catalog rev 3, what the Singapore cluster holds'],
+      facts: ['Delhi (IN-DL)', 'mobile', 'consent granted', 'site glow-deals-feed.example, added to excl_buyer_blocklist in rev 4', 'replayed against catalog rev 3, what edge_sg_1 holds'],
       verdict: function (b) {
         var d = b.compare && find(b.compare.differences, 'seg_glowroot_premium_north');
-        return d ? { tone: 'bad', head: 'DIVERGES: the stale copy serves what the active version excludes', text: 'The Singapore cluster is on catalog rev 3, before the site was added to the buyer blocklist. It would be ' + d.held + ' while the active catalog says ' + d.active + '. That is a wider stale copy: a leak and a brand-safety risk. Policy: request a pause. If the cluster cannot be reached, use the kill switch, then the segment\'s local expiry (15 minutes, because this segment is strict).' } : { tone: 'bad', head: 'No divergence', text: 'Unexpected. Reset the demo.' };
+        return d ? { tone: 'bad', head: 'DIVERGES: the stale copy accepts what the active version excludes', text: 'edge_sg_1 still serves catalog rev 3, from before the buyer blocked this site, because its reload of the newer revision failed. On its copy the request is ' + d.held + '; on the active copy it is ' + d.active + '. So the deal could be bid on where the buyer said no. The hub does not send a stop command. The head every server reads says what to do: Premium North is strict, so edge_sg_1 stops it on its own 15 minutes after it learned it was behind, unless it catches up first. The other two Singapore servers are correct and keep serving.' } : { tone: 'bad', head: 'No divergence', text: 'Unexpected. Reset the demo.' };
       }, link: ['sync', 'seg_glowroot_premium_north', 'See it on the sync board'] }
   ];
   async function runScenario(s) {
@@ -240,10 +303,10 @@ body.logopen main{padding-bottom:56vh}
   }
   // ---------------------------------------------------------------- guided replay
   var REPLAY = [
-    { t: 'The client complains.', d: 'Their ad ran on a site they excluded. Replay that request against the copy the Singapore cluster holds.' },
-    { t: 'The hub sees it.', d: 'Open the sync board for the same segment and read what it says about that cluster.' },
-    { t: 'An approver asks for a pause.', d: 'Only high-risk stale copies are targeted. Narrower copies are skipped on purpose.' },
-    { t: 'The server confirms.', d: 'The cluster pulls the signed snapshot, applies it and acknowledges.' },
+    { t: 'A blocked site is still eligible on one server.', d: 'The buyer added glow-deals-feed.example to their blocklist. Replay a request from that site against the copy edge_sg_1 holds.' },
+    { t: 'The hub sees the one server, not just its cluster.', d: 'Open the sync board for Premium North and read the Singapore rows.' },
+    { t: 'Nobody sends a stop. The server enforces its own deadline.', d: 'Move the clock 15 minutes. edge_sg_1 keeps reading the head, sees its deadline pass, stops the segment and reports it.' },
+    { t: 'The fix lands.', d: 'An engineer fixes the reload. edge_sg_1 pulls the signed snapshot, applies it and reports it active.' },
     { t: 'Back in sync.', d: 'Read the board again.' }
   ];
   async function replayStep() {
@@ -254,22 +317,24 @@ body.logopen main{padding-bottom:56vh}
         await api('POST', '/v1/demo/reset', { token: null }); state.scen = {};
         var r = await api('POST', '/v1/match', { token: 'tok_priya_adops', query: SCEN[4].query, body: SCEN[4].body });
         var d = r.status === 200 && r.body.compare && find(r.body.compare.differences, seg);
-        R.notes.push(d ? 'The request is "' + d.held + '" on the copy the Singapore cluster holds and "' + d.active + '" on the active one. The client was right.' : 'No divergence found. Press Start again.');
+        R.notes.push(d ? 'On the copy edge_sg_1 holds, the request is "' + d.held + '" for Premium North. On the active copy it is "' + d.active + '". The deal could be bid on where the buyer said no. Nothing errored.' : 'No divergence found. Press Start again.');
         if (!d) R.step = -1;
       } else if (R.step === 1) {
         state.syncSeg = seg; await loadSync();
-        var c = sg(state.sync.sync.consumers), sm = state.sync.sync.summary;
-        R.notes.push(c.name + ' is ' + c.state.replace('_', ' ') + ': ' + (CLS[c.classification] || [c.classification])[0] + '. About ' + fmtSecs(c.seconds_until_local_expiry) + ' until local expiry. Recommended action: ' + (ACT[c.recommended_action] || c.recommended_action) + '. High-risk stale exposure so far: ' + sm.high_risk_stale_exposure_traffic_minutes + ' traffic-minutes.');
+        var c = sg(state.sync.sync.consumers), sm = state.sync.sync.summary, cl = sm.clusters.filter(function (x) { return x.cluster === 'singapore'; })[0];
+        R.notes.push('Singapore: ' + cl.in_sync + ' of ' + cl.instances + ' servers on the active copy. One report per cluster would have said "' + cl.one_report_per_cluster_would_say + '". edge_sg_1 received rev ' + c.received_rev + ' but its reload failed, so it still serves rev ' + c.held_rev + ': a wider copy. On the server: ' + onServerText(c) + '. Exposure so far: ' + sm.high_risk_stale_exposure_traffic_minutes + ' traffic-minutes.');
       } else if (R.step === 2) {
-        var p = await api('POST', '/v1/segments/' + seg + '/transitions', { token: 'tok_rahul_approver', body: { action: 'pause', reason: 'Replay: wider stale copy on the Singapore cluster' }, headers: { 'idempotency-key': uid() } });
-        R.notes.push(p.status === 202 ? 'Rahul requests a pause for ' + p.body.pending.join(', ') + (p.body.skipped && p.body.skipped.length ? ' and skips ' + p.body.skipped.map(function (x) { return x.consumer_id; }).join(', ') + ' (under-delivery only)' : '') + '.' : 'The pause answered ' + p.status + ': ' + errText(p));
+        await api('POST', '/v1/demo/advance', { token: null, body: { seconds: 900 } }); await loadSync();
+        var c1 = sg(state.sync.sync.consumers), sm1 = state.sync.sync.summary;
+        R.notes.push(c1.on_server && c1.on_server.status === 'stopped' ? 'edge_sg_1 reports Premium North stopped (' + reasonText(c1.on_server.reason) + '). Exposure stopped growing at ' + sm1.high_risk_stale_exposure_traffic_minutes + ' traffic-minutes. The other Singapore servers kept serving the correct copy. The hub never sent a command.' : 'edge_sg_1: ' + onServerText(c1) + '.');
       } else if (R.step === 3) {
+        await api('POST', '/v1/demo/consumers/edge_sg_1/mode', { token: null, body: { mode: 'healthy' } });
         var sy = await api('POST', '/v1/demo/consumers/edge_sg_1/sync', { token: null, body: {} });
-        R.notes.push(sy.status < 300 ? 'Singapore: ' + sy.body.result + '. It also confirms the pause.' : errText(sy));
+        R.notes.push(sy.status < 300 ? 'edge_sg_1: ' + sy.body.result + '. Premium North is live again there, on the correct copy.' : errText(sy));
       } else if (R.step === 4) {
         await loadSync();
-        var c2 = sg(state.sync.sync.consumers), sm2 = state.sync.sync.summary;
-        R.notes.push(c2.name + ' is ' + c2.state.replace('_', ' ') + ', pause ' + c2.pause + '. High-risk stale exposure is now ' + sm2.high_risk_stale_exposure_traffic_minutes + '. The incident closed in the time it took to read five steps.');
+        var sm2 = state.sync.sync.summary, cl2 = sm2.clusters.filter(function (x) { return x.cluster === 'singapore'; })[0];
+        R.notes.push('Singapore: ' + cl2.in_sync + ' of ' + cl2.instances + ' on the active copy. Exposure total for the incident review: ' + sm2.high_risk_stale_exposure_traffic_minutes + ' traffic-minutes. The hub detected and classified; the server enforced; a person fixed the cause.');
       }
       if (R.step >= 0) R.step++; else { R.step = 0; R.notes = []; }
       await refreshDemo();
@@ -291,17 +356,42 @@ body.logopen main{padding-bottom:56vh}
       h('button', { class: 'sm', onclick: function () { state.replay = null; render(); } }, 'Start again')));
     v.append(card);
   }
+  function renderOutage(v) {
+    var o = state.outage;
+    v.append(h('div', { class: 'card' },
+      h('div', { class: 'row' }, h('b', {}, 'What if the hub itself goes down?'), h('span', { class: 'muted small' }, 'Takes the hub API down for 20 simulated minutes. Servers keep reading the head from object storage.')),
+      h('div', { style: 'margin-top:8px' }, h('button', { class: 'sm', onclick: async function () {
+        var r = await api('POST', '/v1/demo/hub-outage', { token: null, body: { minutes: 20 } }); state.outage = r; await refreshDemo(); render(); } }, o ? 'Run again' : 'Take the hub down for 20 minutes')),
+      o ? (o.status === 200 ? h('div', {},
+        o.body.strict_copies_stopped_by_lease === 0 ? h('div', { style: 'float:right;margin-left:12px' }, chroma('outage', 'maintenance', { line: 'The hub was down. The servers did not notice.' })) : null,
+        h('div', { class: 'verdict good' }, o.body.strict_copies_stopped_by_lease + ' strict copies stopped by the lease. ' + o.body.strict_copies_that_would_stop_if_the_lease_counted_from_the_hub_api + ' would have stopped if the lease counted from the hub API.'),
+        h('div', {}, o.body.meaning),
+        o.body.other_stops_during_the_outage.length ? h('div', { class: 'muted small', style: 'margin-top:4px' }, 'Stops that did happen, because those servers already knew they were behind: ' + o.body.other_stops_during_the_outage.join('; ')) : null)
+        : h('div', { class: 'verdict bad' }, errText(o))) : null));
+  }
+  function storyChroma() {
+    var R = state.replay, step = R ? R.step : 0;
+    if (step <= 0) {
+      var egg = EGG[state.egg || 0];
+      return chroma('story', egg[0], { size: 'md', line: egg[1], onclick: function () { state.egg = ((state.egg || 0) + 1) % EGG.length; render(); } });
+    }
+    var byStep = [null, ['mismatch', 'Hmm, something doesn\'t match.'], ['investigating', 'Found it: one server, not the whole cluster.'], ['contained', 'Contained. The server kept its word.'], ['updating', 'Getting everyone up to speed.'], ['synced', 'Everyone\'s on the same page.']];
+    var s = byStep[Math.min(step, 5)];
+    return chroma('story', s[0], { size: 'md', line: s[1] });
+  }
   function renderStory(v) {
-    v.append(h('h2', {}, 'The GlowRoot story in five requests'),
-      h('p', { class: 'lead' }, 'A fictional D2C skincare brand targets festive shoppers in East India. Each button sends a real bid-request-style call to POST /v1/match and explains the answer.'));
+    v.append(h('div', { class: 'headrow' }, h('div', {}, h('h2', {}, 'The GlowRoot story in five requests'),
+      h('p', { class: 'lead' }, 'A fictional D2C skincare brand runs two curated deals. Each request button sends a real bid-request-style call to POST /v1/match and explains the answer. A match means the request is eligible for the deal; whether an ad is bid on, wins and serves is decided later.')),
+      storyChroma()));
     v.append(h('div', { class: 'card' },
       h('b', {}, 'What this is, in one line. '), 'One internal API where AdOps defines who an ad may reach, tests and publishes it with a second pair of eyes, and sees whether every ad server actually runs the active version.',
       h('details', {}, h('summary', {}, 'What is real here and what is simulated'),
         h('ul', { class: 'small' },
-          h('li', {}, 'Real: the rule engine, validation, versions, fingerprints, blast-radius diff, four-eyes, snapshots with ETag and delta, acks with three states, stale-copy policy, local expiry, idempotency. All 79 tests run on this same code.'),
-          h('li', {}, 'Simulated: tokens are fixed demo tokens, snapshot signatures are a demo hash, consent strings are not decoded (a string containing "denied" counts as no consent), consumers and their traffic shares are made up, state is in memory.'),
+          h('li', {}, 'Real: the rule engine, validation, versions, fingerprints, blast-radius diff, four-eyes, exclusion lists, deal bindings, snapshots with ETag and delta, the signed head with its stop rules, reports in three states, stale-copy policy, idempotency. The automated tests in the Tests tab run on this same code.'),
+          h('li', {}, 'Simulated: the ad servers themselves (a small simulator plays each one, following the rules in the head), tokens are fixed demo tokens, signatures are a demo hash, consent strings are not decoded (a string containing "denied" counts as no consent), traffic shares are made up, state is in memory.'),
           h('li', {}, 'Not claimed: that Media.net\'s real systems work this way. See the document for assumptions.')))));
     renderReplay(v);
+    renderOutage(v);
     SCEN.forEach(function (s) {
       var out = state.scen[s.n], card = h('div', { class: 'card' });
       card.append(h('div', { class: 'row' }, chip('Request ' + s.n, 'info'), h('b', {}, s.title), h('span', { class: 'muted small' }, s.shows)));
@@ -330,12 +420,13 @@ body.logopen main{padding-bottom:56vh}
     var r = await api('GET', '/v1/segments');
     state.list = r.status === 200 ? r.body.items : [];
     if (!state.segId && state.list.length) state.segId = state.list[0].segment_id;
+    if (!state.list.length) { state.segId = null; state.seg = null; state.segErr = null; }
     if (state.segId) { var d = await api('GET', '/v1/segments/' + state.segId); state.seg = d.status === 200 ? d.body : null; if (d.status !== 200) state.segErr = errText(d); else state.segErr = null; }
   }
   async function transit(action, version, extra) {
     var body = Object.assign({ action: action, version: version }, extra || {});
     var r = await api('POST', '/v1/segments/' + state.segId + '/transitions', { body: body, headers: { 'idempotency-key': uid() } });
-    if (r.status < 300) { toast(action + ' ok', 'good'); if (action === 'submit') state.radius = { version: version, br: r.body.blast_radius }; }
+    if (r.status < 300) { toast(action === 'publish' ? 'Published as catalog rev ' + r.body.catalog_rev + '. Servers pick it up on their next head read.' : action + ' ok', 'good', action === 'publish' ? 'shipped' : null); if (action === 'submit') state.radius = { version: version, br: r.body.blast_radius }; }
     else toast(errText(r) + (r.body && r.body.error === 'forbidden' ? '. Switch "Acting as" at the top.' : ''), 'bad');
     await refreshDemo(); await loadSegments(); render();
     return r;
@@ -347,7 +438,7 @@ body.logopen main{padding-bottom:56vh}
       if (steps[i][1] === 'submit' && r.status === 200) state.radius = { version: version, br: r.body.blast_radius };
       if (r.status >= 300) { toast(steps[i][1] + ': ' + errText(r), 'bad'); break; }
     }
-    toast('Submitted by Priya, approved and published by Rahul', 'good');
+    if (i === steps.length) toast('Submitted by Priya, approved and published by Rahul. Servers pick it up on their next head read.', 'good', 'shipped');
     await refreshDemo(); await loadSegments(); render();
   }
   function fmtIN(n) { var x = String(Math.round(Math.abs(n))); return x.length <= 3 ? x : x.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ',' + x.slice(-3); }
@@ -358,7 +449,7 @@ body.logopen main{padding-bottom:56vh}
     var r = asNew
       ? await api('POST', '/v1/segments', { body: { name: name, advertiser_id: 'adv_glowroot', rule: rule }, headers: { 'idempotency-key': uid() } })
       : await api('POST', '/v1/segments/' + state.segId + '/versions', { body: { rule: rule }, headers: { 'idempotency-key': uid() } });
-    if (r.status === 201) { toast('Saved as ' + r.body.segment_id + ' v' + r.body.version + (r.body.validation.warnings.length ? '. ' + r.body.validation.warnings.join(' ') : ''), 'good'); if (asNew) state.segId = r.body.segment_id; await loadSegments(); render(); }
+    if (r.status === 201) { state.builderErr = null; toast('Saved as ' + r.body.segment_id + ' v' + r.body.version + ', in draft' + (r.body.validation.warnings.length ? '. ' + r.body.validation.warnings.join(' ') : ''), 'good'); if (asNew) state.segId = r.body.segment_id; await loadSegments(); render(); }
     else { state.builderErr = errText(r) + (r.body && r.body.path ? ' (at ' + r.body.path + ')' : ''); toast(state.builderErr, 'bad'); render(); }
   }
   function tweak(fn) {
@@ -368,10 +459,11 @@ body.logopen main{padding-bottom:56vh}
   function renderSegments(v) {
     v.append(h('h2', {}, 'Create, test, approve and publish'), h('p', { class: 'lead' }, 'Versions never change once saved. A version is draft, then submitted (with a blast-radius diff and a reach estimate), approved by a different person, then published. To get a draft, change the rule in the editor below and save it as a new version, then use Run full flow on it.'));
     var list = h('div', { class: 'row', style: 'margin-bottom:10px' });
-    (state.list || []).forEach(function (s) { list.append(h('button', { class: s.segment_id === state.segId ? 'pri sm' : 'sm', onclick: async function () { state.segId = s.segment_id; state.builder = ''; state.radius = null; await loadSegments(); render(); } }, s.name + ' (v' + s.active_version + ')')); });
+    (state.list || []).forEach(function (s) { list.append(h('button', { class: s.segment_id === state.segId ? 'pri sm' : 'sm', onclick: async function () { state.segId = s.segment_id; state.builder = ''; state.radius = null; await loadSegments(); render(); } }, s.name + (s.active_version ? ' (v' + s.active_version + ')' : ' (draft)'))); });
     v.append(list);
     var s = state.seg;
-    if (!s) { v.append(h('div', { class: 'card' }, state.segErr || 'No segments visible to this actor.')); }
+    if (!s) { v.append(h('div', { class: 'card' }, h('div', { class: 'row' }, chroma('segempty', 'empty', { size: 'md', line: 'Every great rule starts somewhere.' }),
+      h('div', {}, h('b', {}, state.segErr || 'No segments visible to this actor.'), h('div', { class: 'muted small' }, 'Segments are scoped to an advertiser. Switch "Acting as" at the top, or create one with the rule editor below.'))))); }
     else {
       if (!state.builder) state.builder = ruleText(s.active ? s.active.rule : s.versions[s.versions.length - 1].rule);
       var tbl = h('table', {}, h('tr', {}, ['Version', 'Status', 'Created by', 'Fingerprint', 'Step'].map(function (x) { return h('th', {}, x); })));
@@ -383,22 +475,24 @@ body.logopen main{padding-bottom:56vh}
         if (ver.status === 'superseded') act.append(h('button', { class: 'sm', onclick: function () { transit('rollback', ver.version, { reason: 'Rolled back in the demo' }); } }, 'Roll back to this'));
         tbl.append(h('tr', {}, h('td', {}, 'v' + ver.version), h('td', {}, pill(ver.status)), h('td', {}, ver.created_by + (ver.approved_by ? ', approved by ' + ver.approved_by : '')), h('td', { class: 'mono' }, ver.fingerprint), h('td', {}, act)));
       });
-      v.append(h('div', { class: 'card' }, h('div', { class: 'row' }, h('b', {}, s.name), h('span', { class: 'mono muted small' }, s.segment_id), s.paused ? chip('paused', 'bad') : null),
+      v.append(h('div', { class: 'card' }, h('div', { class: 'row' }, h('b', {}, s.name), h('span', { class: 'mono muted small' }, s.segment_id), s.paused ? chip('stopped everywhere', 'bad') : null,
+        s.active && s.active.deal_ids.length ? h('span', { class: 'small' }, 'Deals: ', s.active.deal_ids.map(function (d) { return chip(d, 'info'); })) : null),
         h('div', { class: 'scroll' }, tbl),
         h('div', { class: 'small muted' }, 'Four-eyes: the person who created a version cannot approve or publish it. Try "Approve" while acting as Priya, then as Rahul. Rollback only works on a version that was live before.')));
       if (state.radius) {
         var br = state.radius.br;
-        v.append(h('div', { class: 'card' }, h('div', { class: 'row' }, h('b', {}, 'Blast radius of v' + state.radius.version), chip('vs live v' + br.vs_active, 'grey')),
+        v.append(h('div', { class: 'card' }, h('div', { class: 'headrow' }, h('div', { class: 'row' }, h('b', {}, 'Blast radius of v' + state.radius.version), chip('vs live v' + br.vs_active, 'grey')),
+            br.publish_risk === 'high' ? chroma('radius', 'second_look', { line: 'Wider reach. Worth a careful second look.' }) : chroma('radius', 'validated', { line: 'Looking good. Ready for approval.' })),
           h('div', { class: 'grid g4', style: 'margin:8px 0' },
             h('div', { class: 'tile' }, h('span', {}, 'This change'), h('b', { style: 'font-size:16px' }, br.new_version_change)),
             h('div', { class: 'tile' }, h('span', {}, 'Publish risk'), h('b', { style: 'font-size:16px' }, br.publish_risk)),
-            h('div', { class: 'tile' }, h('span', {}, 'A server left on the old copy would be'), h('b', { style: 'font-size:16px' }, br.stale_copy_behavior)),
+            h('div', { class: 'tile' }, h('span', {}, 'A server left on the old copy would be'), h('b', { style: 'font-size:16px' }, br.old_copy_would_be)),
             h('div', { class: 'tile' }, h('span', {}, 'Stale-copy risk'), h('b', { style: 'font-size:16px' }, br.stale_copy_risk))),
           br.estimated_reach ? h('div', { class: 'tile', style: 'margin:0 0 8px' }, h('span', {}, 'Estimated reach, simulated sample'), h('b', { style: 'font-size:16px' }, reachLine(br.estimated_reach)), h('span', {}, br.estimated_reach.basis)) : null,
           h('div', {}, br.plain_language), h('details', {}, h('summary', {}, 'Raw blast_radius'), pre(br))));
       }
     }
-    var errBox = state.builderErr ? h('div', { class: 'verdict bad' }, state.builderErr) : null;
+    var errBox = state.builderErr ? h('div', { class: 'row', style: 'flex-wrap:nowrap;margin-top:8px' }, chroma('ruleerr', 'invalid', { size: 'xs' }), h('div', { class: 'verdict bad', style: 'flex:1;margin:0' }, state.builderErr)) : null;
     var nameIn = h('input', { type: 'text', id: 'newname', value: 'GlowRoot Diwali Gifting', style: 'min-width:220px' });
     v.append(h('div', { class: 'card' }, h('b', {}, 'Rule editor'), h('div', { class: 'muted small' }, 'Edit the JSON, then save it as a new version of the selected segment or as a new segment. Bad rules are refused with a specific error.'),
       h('div', { class: 'row', style: 'margin:8px 0' },
@@ -411,8 +505,26 @@ body.logopen main{padding-bottom:56vh}
   }
 
   // ---------------------------------------------------------------- sync board
-  var CLS = { narrower_subset: ['narrower copy, low risk', 'warn'], wider_superset: ['wider copy, HIGH risk', 'bad'], mixed: ['mixed change, treated as wider, HIGH risk', 'bad'], unclassified: ['unclassified, treated as wider', 'bad'], missing_in_held: ['segment not held, low risk', 'warn'], tier_only: ['tiers only, low risk', 'grey'], same: ['same as active', 'good'] };
-  var ACT = { none: 'Nothing to do', alert_p2_and_refresh: 'P2 alert, force a refresh. Never pause', request_pause: 'Request a pause', kill_switch_then_expiry: 'Unreachable: kill switch, then local expiry', kill_switch_now: 'Consent critical: request a pause and use the kill switch now', probe_and_alert: 'Probe and alert. Local expiry applies if silent', pause_requested: 'Pause requested, waiting for confirmation', pause_confirmed: 'Pause confirmed' };
+  var CLS = { narrower: ['held copy narrower, low risk', 'warn'], wider: ['held copy WIDER, high risk', 'bad'], mixed: ['mixed change, treated as wider, high risk', 'bad'], unclassified: ['unclassified, treated as wider', 'bad'], missing: ['segment not held yet, low risk', 'warn'], tiers_only: ['tiers only, low risk', 'grey'], same: ['same as active', 'good'] };
+  var HUB = { none: 'Nothing to do', probe: 'Probe and alert', alert_p2_refresh: 'P2 alert, refresh. Never stop it', alert_p1_server_stops_at_deadline: 'P1 alert. The server stops it at its deadline', alert_p1_decide_stop_everywhere: 'P1 alert. A person decides whether to stop it everywhere', alert_p1_fix_reload: 'P1: stopped on this server. Fix the reload', alert_p0_server_not_stopping: 'P0: deadline passed, server has not reported stopping', alert_p0: 'P0: consent critical' };
+  var MODE_TEXT = { healthy: null, deferred: 'reloads on a schedule', failing: 'reload failing', not_integrated: 'not integrated yet' };
+  function reasonText(r) { return { deadline_passed: 'its deadline passed', revoked: 'stopped everywhere', lease_expired: 'no head read for 15 minutes', consent_critical: 'consent critical, stopped at once' }[r] || r; }
+  function secs(n) { return h('span', { class: 'mono', 'data-secs': n }, fmtSecs(n)); }
+  function onServerText(c) {
+    var o = c.on_server; if (!o) return c.state === 'in_sync' ? 'serving the active copy' : 'nothing reported';
+    return ({ will_stop: 'stops this segment in ' + fmtSecs(o.seconds_left) + ' unless it catches up', overdue: 'deadline passed, not reported stopped', stopped: 'stopped (' + reasonText(o.reason) + ')',
+      expected_stopped: 'should have stopped by lease, not confirmed', stops_by_lease: 'cut off: stops by lease in ' + fmtSecs(o.seconds_left), not_yet_aware: 'has not read the newer head yet',
+      will_drop_audience: 'drops audience tiers in ' + fmtSecs(o.seconds_left), audience_dropped: 'audience tiers dropped, serving context only', keeps_serving: 'keeps serving (under-delivers only)',
+      keeps_serving_alert: 'keeps serving, alert raised', unknown: 'keeps its last copy (standard segment)' })[o.status] || o.status;
+  }
+  function onServerCell(c) {
+    var o = c.on_server; if (!o) return h('span', { class: 'muted' }, c.state === 'in_sync' ? 'serving the active copy' : '-');
+    var tone = { will_stop: 'warn', overdue: 'bad', stopped: 'info', expected_stopped: 'info', stops_by_lease: 'warn', not_yet_aware: 'warn', will_drop_audience: 'warn', audience_dropped: 'info', keeps_serving: 'grey', keeps_serving_alert: 'warn', unknown: 'grey' }[o.status] || 'grey';
+    var label = { will_stop: 'will stop', overdue: 'overdue', stopped: 'stopped by server', expected_stopped: 'stopped by lease (expected)', stops_by_lease: 'lease running', not_yet_aware: 'not yet aware', will_drop_audience: 'will drop audience', audience_dropped: 'context only', keeps_serving: 'keeps serving', keeps_serving_alert: 'keeps serving', unknown: 'keeps last copy' }[o.status] || o.status;
+    var sub = o.status === 'will_stop' || o.status === 'stops_by_lease' || o.status === 'will_drop_audience' ? h('div', { class: 'small' }, 'in ', secs(o.seconds_left)) :
+      o.status === 'stopped' ? h('div', { class: 'muted small' }, reasonText(o.reason)) : o.note ? h('div', { class: 'muted small' }, o.note) : null;
+    return h('div', {}, chip(label, tone), sub);
+  }
   async function loadSync() {
     var r = await api('GET', '/v1/segments/' + state.syncSeg, { query: { include: 'sync' } });
     state.sync = r.status === 200 ? r.body : null; state.syncErr = r.status === 200 ? null : errText(r); state.syncAt = Date.now();
@@ -422,53 +534,76 @@ body.logopen main{padding-bottom:56vh}
     toast(label ? label(r) : (r.status < 300 ? 'ok' : errText(r)), r.status < 300 ? 'good' : 'bad');
     await refreshDemo(); await loadSync(); render();
   }
+  function syncChroma(s) {
+    var sum = s.sync.summary, stale = s.sync.consumers.some(function (c) { return c.state === 'confirmed_stale'; });
+    if (sum.serving_wider_copy_share_pct > 0) return chroma('sync', 'mismatch', { line: 'Hmm, something doesn\'t match.' });
+    if (stale) return chroma('sync', 'contained', { line: 'Nothing wider is live. Waiting on a refresh.' });
+    return chroma('sync', 'synced', { line: 'Every server that reports is on the same page.' });
+  }
   function renderSync(v) {
-    v.append(h('h2', {}, 'Sync board: is every ad server running the active rule?'),
-      h('p', { class: 'lead' }, 'Servers pull a signed snapshot and ack the revision they run. Only an "active" ack counts as in sync. The board compares each server\'s copy with the active one and decides how urgent it is.'));
+    v.append(h('div', { class: 'headrow' }, h('h2', {}, 'Sync board: is every ad server running the active rule?'), state.sync ? syncChroma(state.sync) : null),
+      h('p', { class: 'lead' }, 'Every server reads a small signed head every 30 seconds, pulls the snapshot when it is behind, and reports what it serves. Only an "active" report counts as in sync. The hub compares each server\'s copy with the active one. It never sends a stop command: the head tells each server what to do if it cannot catch up, and the server enforces that itself.'));
     var segSel = h('select', { onchange: async function (e) { state.syncSeg = e.target.value; await loadSync(); render(); } },
-      (state.dstate ? state.dstate.segments : []).map(function (s) { return h('option', { value: s.segment_id, selected: s.segment_id === state.syncSeg }, s.name); }));
+      (state.dstate ? state.dstate.segments : []).map(function (s) { return h('option', { value: s.segment_id, selected: s.segment_id === state.syncSeg }, s.name + (s.paused ? ' (stopped)' : '')); }));
     var site = h('input', { type: 'text', value: 'new-spam.example', style: 'width:200px' });
     v.append(h('div', { class: 'card' }, h('div', { class: 'row' }, h('b', {}, 'Segment'), segSel,
       h('span', { class: 'muted small' }, 'Move the clock:'),
-      [[900, '+15 min'], [3600, '+1 hour'], [14400, '+4 hours']].map(function (x) { return h('button', { class: 'sm', onclick: function () { demoCall('/v1/demo/advance', { seconds: x[0] }, function () { return 'Clock moved ' + x[1]; }); } }, x[1]); })),
-      h('div', { class: 'row', style: 'margin-top:8px' }, h('span', { class: 'muted small' }, 'Exclusion-list owner adds a site (one approval for the list, no new segment versions):'), site,
-        h('button', { class: 'sm', onclick: function () { demoCall('/v1/demo/lists/excl_buyer_blocklist/domains', { domain: site.value }, function (r) { return r.status < 300 ? 'excl_buyer_blocklist v' + r.body.version + ' published, catalog rev ' + r.body.catalog_rev + '. Servers on older revisions are now stale.' : errText(r); }); } }, 'Add to excl_buyer_blocklist'))));
+      [[900, '+15 min'], [3600, '+1 hour'], [14400, '+4 hours']].map(function (x) { return h('button', { class: 'sm', onclick: function () { demoCall('/v1/demo/advance', { seconds: x[0] }, function () { return 'Clock moved ' + x[1] + '. Servers read the head and reported.'; }); } }, x[1]); })),
+      h('div', { class: 'row', style: 'margin-top:8px' }, h('span', { class: 'muted small' }, 'Add a site to the buyer\'s exclusion list (adding only narrows reach, so one person may publish it):'), site,
+        h('button', { class: 'sm', onclick: async function () {
+          var r = await api('POST', '/v1/lists/excl_buyer_blocklist/versions', { body: { add: [site.value], reason: 'Added from the sync board' }, headers: { 'idempotency-key': uid() } });
+          toast(r.status < 300 ? 'excl_buyer_blocklist v' + r.body.version + ' published as catalog rev ' + r.body.catalog_rev + '. Healthy servers applied it at once.' : errText(r) + (r.status === 403 ? '. Switch "Acting as" to Priya.' : ''), r.status < 300 ? 'good' : 'bad');
+          await refreshDemo(); await loadSync(); render(); } }, 'Add to excl_buyer_blocklist'))));
     var s = state.sync;
     if (!s) { v.append(h('div', { class: 'card' }, state.syncErr || 'Loading')); return; }
     var sum = s.sync.summary;
     v.append(h('div', { class: 'grid g4' },
-      h('div', { class: 'tile' }, h('b', {}, sum.stale_version_impression_share_pct + '%'), h('span', {}, 'Traffic on servers that are behind, right now (simulated shares)')),
-      h('div', { class: 'tile' }, h('b', {}, sum.high_risk_stale_share_pct + '%'), h('span', {}, 'of traffic on a high-risk stale copy')),
-      h('div', { class: 'tile' }, h('b', {}, String(sum.high_risk_stale_exposure_traffic_minutes) + ' share-weighted min'), h('span', {}, 'High-risk stale exposure: traffic share times minutes behind. Measured from acks alone, so it works from day one')),
-      h('div', { class: 'tile' }, h('b', {}, sum.ack_coverage_pct + '%'), h('span', {}, 'Ack coverage. ' + sum.unknown_share_pct + '% of traffic is on servers we cannot confirm, so read the numbers beside it with this'))));
-    var tbl = h('table', {}, h('tr', {}, ['Consumer', 'State', 'Holds', 'Versus active', 'Local expiry', 'Policy', ''].map(function (x) { return h('th', {}, x); })));
-    s.sync.consumers.forEach(function (c) {
-      var st = c.state === 'in_sync' ? chip('in sync', 'good') : c.state === 'confirmed_stale' ? chip('confirmed stale', c.risk === 'high' ? 'bad' : 'warn') : chip('unknown', 'grey');
-      var cl = c.classification ? CLS[c.classification] || [c.classification, 'grey'] : null;
-      var act = ACT[c.recommended_action] || c.recommended_action;
-      var exp = c.seconds_until_local_expiry == null ? h('span', { class: 'muted' }, c.state === 'in_sync' ? 'n/a' : 'n/a') : h('span', { class: 'mono', 'data-secs': c.seconds_until_local_expiry }, fmtSecs(c.seconds_until_local_expiry));
-      var outcome = c.local_expiry_outcome ? chip({ fail_closed: 'fails closed', degrade_to_context_only: 'degrades to context only', keep_serving_with_alert: 'keeps serving, alerting' }[c.local_expiry_outcome], c.local_expiry_outcome === 'fail_closed' ? 'bad' : 'warn') : null;
-      tbl.append(h('tr', {},
-        h('td', {}, h('b', {}, c.name), h('div', { class: 'muted small mono' }, c.consumer_id + ', ' + Math.round(c.traffic_share * 100) + '% of traffic'), c.unreachable ? chip('not answering probes', 'bad') : null),
-        h('td', {}, st), h('td', {}, c.held_rev == null ? 'nothing acked' : 'rev ' + c.held_rev + (c.held_version ? ', segment v' + c.held_version : '')),
-        h('td', {}, cl ? chip(cl[0], cl[1]) : '-', c.summary ? h('div', { class: 'muted small' }, c.summary) : (c.note ? h('div', { class: 'muted small' }, c.note) : null)),
-        h('td', {}, exp, c.expiry_class !== undefined && c.seconds_until_local_expiry != null ? h('div', { class: 'muted small' }, c.expiry_class + ' class') : null, outcome),
-        h('td', {}, act, c.pause && c.pause !== 'none' ? h('div', {}, chip('pause ' + c.pause, c.pause === 'confirmed' ? 'good' : 'warn')) : null),
-        h('td', {}, h('div', { class: 'row' },
-          h('button', { class: 'sm', onclick: function () { demoCall('/v1/demo/consumers/' + c.consumer_id + '/sync', {}, function (r) { return r.status < 300 ? c.consumer_id + ': ' + r.body.result : errText(r); }); } }, 'Sync now'),
-          h('button', { class: 'sm', onclick: function () { demoCall('/v1/demo/consumers/' + c.consumer_id + '/unreachable', { value: !c.unreachable }, function (r) { return c.consumer_id + (r.body.unreachable ? ' stops answering' : ' answers again'); }); } }, c.unreachable ? 'Make reachable' : 'Make unreachable')))));
+      h('div', { class: 'tile' }, h('b', {}, sum.serving_wider_copy_share_pct + '%'), h('span', {}, 'of traffic on servers still serving a wider copy of this segment')),
+      h('div', { class: 'tile' }, h('b', {}, String(sum.high_risk_stale_exposure_traffic_minutes)), h('span', {}, 'High-risk exposure so far, in traffic-minutes: traffic share times minutes a wider copy stayed live past a 2 minute propagation window. ' + (sum.exposure_still_growing ? 'Still growing.' : 'Not growing.'))),
+      h('div', { class: 'tile' }, h('b', {}, sum.stopped_locally), h('span', {}, 'servers that stopped this segment on their own (reported, or expected by lease)')),
+      h('div', { class: 'tile' }, h('b', {}, sum.ack_coverage_pct + '%'), h('span', {}, 'of servers report (' + sum.ack_coverage_traffic_pct + '% of traffic). ' + sum.unknown_share_pct + '% of traffic is unknown, so read the numbers beside it with this'))));
+    var byId = {}; s.sync.consumers.forEach(function (c) { byId[c.consumer_id] = c; });
+    var tbl = h('table', {}, h('tr', {}, ['Server', 'State', 'Holds', 'Held copy versus active', 'On the server', 'Hub'].map(function (x) { return h('th', {}, x); })));
+    var order = function (cl) { return cl.hides_a_problem || cl.stale ? 0 : cl.cluster === 'deal_tagger' ? 2 : 1; };
+    sum.clusters.slice().sort(function (a, b) { return order(a) - order(b) || b.traffic_share - a.traffic_share; }).forEach(function (cl) {
+      tbl.append(h('tr', {}, h('td', { colspan: 6, style: 'background:var(--code)' }, h('div', { class: 'row' },
+        h('b', {}, cl.name), h('span', { class: 'small' }, cl.in_sync + ' of ' + cl.instances + ' on the active copy, ' + Math.round(cl.traffic_share * 100) + '% of traffic'),
+        cl.hides_a_problem ? chip('One report per cluster would say "in sync" and hide this', 'bad') : null))));
+      s.sync.consumers.filter(function (c) { return c.cluster === cl.cluster; }).forEach(function (c) {
+        var st = c.state === 'in_sync' ? chip('in sync', 'good') : c.state === 'confirmed_stale' ? chip('stale', c.risk === 'high' ? 'bad' : 'warn') : chip('unknown', 'grey');
+        var clc = c.held_copy ? CLS[c.held_copy] || [c.held_copy, 'grey'] : null;
+        var fail = (c.exceptions || []).filter(function (x) { return x.error === 'apply_failed'; })[0];
+        var modeText = MODE_TEXT[c.mode];
+        tbl.append(h('tr', {},
+          h('td', { style: 'min-width:190px' }, h('b', {}, c.name), ' ', h('span', { class: 'muted small mono' }, c.consumer_id + ' · ' + Math.round(c.traffic_share * 100) + '%'),
+            h('div', {}, c.unreachable ? chip('cut off', 'bad') : modeText ? chip(modeText, c.mode === 'failing' ? 'bad' : 'grey') : null),
+            c.mode === 'not_integrated' ? null : h('div', { class: 'ctlrow' },
+              h('button', { onclick: function () { demoCall('/v1/demo/consumers/' + c.consumer_id + '/sync', {}, function (r) { return r.status < 300 ? c.consumer_id + ': ' + r.body.result : errText(r); }); } }, 'Sync now'),
+              h('button', { onclick: function () { demoCall('/v1/demo/consumers/' + c.consumer_id + '/mode', { mode: c.mode === 'failing' ? 'healthy' : 'failing' }, function () { return c.consumer_id + (c.mode === 'failing' ? ': reload fixed' : ': reload now fails'); }); } }, c.mode === 'failing' ? 'Fix reload' : 'Break reload'),
+              h('button', { onclick: function () { demoCall('/v1/demo/consumers/' + c.consumer_id + '/unreachable', { value: !c.unreachable }, function (r) { return c.consumer_id + (r.body.unreachable ? ' is cut off from the hub and the head' : ' is reconnected'); }); } }, c.unreachable ? 'Reconnect' : 'Cut off'))),
+          h('td', {}, st),
+          h('td', {}, c.held_rev == null ? 'nothing reported' : 'rev ' + c.held_rev + (c.held_version ? ', segment v' + c.held_version : ''),
+            c.received_rev != null && c.held_rev != null && c.received_rev > c.held_rev ? h('div', { class: 'muted small' }, 'received rev ' + c.received_rev + (fail ? ', reload failed' : '')) : null),
+          h('td', {}, clc ? chip(clc[0], clc[1]) : '-', c.summary ? h('div', { class: 'muted small' }, c.summary) : (c.note ? h('div', { class: 'muted small' }, c.note) : null)),
+          h('td', {}, onServerCell(c)),
+          h('td', {}, HUB[c.hub_action] || c.hub_action, c.exposure_traffic_minutes ? h('div', { class: 'muted small' }, 'exposure ' + c.exposure_traffic_minutes + ' traffic-min') : null)));
+      });
     });
+    var segRow = (state.dstate ? state.dstate.segments : []).filter(function (x) { return x.segment_id === state.syncSeg; })[0];
+    var paused = segRow && segRow.paused;
     v.append(h('div', { class: 'card' }, h('div', { class: 'scroll' }, tbl),
       h('div', { class: 'row', style: 'margin-top:10px' },
-        h('button', { class: 'pri sm', onclick: async function () {
-          var r = await api('POST', '/v1/segments/' + state.syncSeg + '/transitions', { body: { action: 'pause', reason: 'Stale copies found on the sync board' }, headers: { 'idempotency-key': uid() } });
-          toast(r.status === 202 ? 'Pause requested for ' + r.body.pending.join(', ') + (r.body.unreachable && r.body.unreachable.length ? '. Unreachable: ' + r.body.unreachable.join(', ') + ', so the kill switch is the backstop' : '') : r.status === 200 ? r.body.message : errText(r) + '. Switch "Acting as" to an approver.', r.status < 300 ? 'good' : 'bad');
-          await refreshDemo(); await loadSync(); render(); } }, 'Request pause for risky stale copies'),
-        h('span', { class: 'muted small' }, 'Needs an approver. Narrower copies are skipped on purpose.')),
-      h('details', {}, h('summary', {}, 'Why a wider and a narrower stale copy get different treatment'),
-        h('table', {}, h('tr', {}, ['New version vs old', 'Risk of publishing it', 'A server left on the old copy is', 'Risk of that stale copy', 'Response'].map(function (x) { return h('th', {}, x); })),
-          h('tr', {}, h('td', {}, 'Expands reach'), h('td', {}, 'High: it can leak'), h('td', {}, 'Narrower'), h('td', {}, 'Low: under-delivery'), h('td', {}, 'Alert and refresh, never pause')),
-          h('tr', {}, h('td', {}, 'Tightens'), h('td', {}, 'Lower: it can over-block'), h('td', {}, 'Wider'), h('td', {}, 'High: leak or compliance'), h('td', {}, 'Pause request, kill switch, then local expiry'))))));
+        h('button', { class: paused ? 'sm' : 'pri sm', onclick: async function () {
+          var r = await api('POST', '/v1/segments/' + state.syncSeg + '/transitions', { body: { action: paused ? 'resume' : 'pause', reason: paused ? 'Resumed from the sync board' : 'Stopped from the sync board' }, headers: { 'idempotency-key': uid() } });
+          toast(r.status < 300 ? (paused ? 'Resumed. Servers pick it up on their next head read.' : 'Stopped everywhere. It is on the revoked list in the head, so every server stops it within 30 seconds.') : errText(r) + (r.status === 403 ? (paused ? '. Resuming restores reach, so switch "Acting as" to an approver.' : '. Switch "Acting as".') : ''), r.status < 300 ? 'good' : 'bad');
+          await refreshDemo(); await loadSync(); render(); } }, paused ? 'Resume this segment (needs an approver)' : 'Stop this segment everywhere'),
+        h('span', { class: 'muted small' }, paused ? 'Resuming restores reach, so it needs a second person.' : 'One person may do this, with a reason, because stopping can only reduce delivery. It travels in the head, so it reaches even a server whose reload is failing.')),
+      h('details', {}, h('summary', {}, 'Why the server enforces the stop, not the hub'),
+        h('ul', { class: 'small' },
+          h('li', {}, 'A stop command from the hub has the same problem as the update it replaces: a server that cannot apply the update may not act on a command either, and a server that cannot reach the hub never hears it.'),
+          h('li', {}, 'So the hub works out the rule once, at publish time, and puts it in the head: for each older copy of a segment, whether that copy is wider, and how long a server may keep serving it. The head is a few kilobytes, separate from the snapshot, and in production lives in object storage.'),
+          h('li', {}, 'Each server applies that rule to its own copy. A wider copy of a strict segment stops 15 minutes after the server learns it is behind. A narrower copy keeps serving, because stopping it would only throw away valid delivery.'),
+          h('li', {}, 'If a server cannot read any head for 15 minutes, it stops its strict segments: it is blind. A hub API outage does not cause this, because the head is not served by the hub API. Try it on the Story tab.')))));
     v.append(h('details', { class: 'card' }, h('summary', {}, 'Catalog revisions'),
       h('table', {}, h('tr', {}, ['Rev', 'When', 'What changed'].map(function (x) { return h('th', {}, x); })),
         (state.dstate ? state.dstate.catalog : []).slice().reverse().map(function (e) { return h('tr', {}, h('td', {}, e.rev), h('td', { class: 'mono small' }, e.created_at.slice(11, 19)), h('td', {}, e.reason)); }))));
@@ -486,66 +621,85 @@ body.logopen main{padding-bottom:56vh}
     var rule = { must: [{ field: 'device.geo.region', in: ['IN-WB', 'IN-OD'] }, { field: 'device.type', in: ['mobile'] }, { field: 'site.domain', not_in_list: 'excl_buyer_blocklist' }], should: [{ tier: 1, all: [{ field: 'audience.purchase_skincare_30d', eq: true }, { field: 'site.cat', in: ['IAB18-1'] }] }, { tier: 2, all: [{ field: 'site.cat', in: ['IAB18-1'] }] }], if_audience_missing: 'fall_back_to_context' };
     var typo = JSON.parse(JSON.stringify(rule)); typo.must[0].field = 'device.geo.regoin';
     var seg = '/v1/segments/seg_glowroot_festive_east';
+    var rev3 = d && d.catalog[3] ? d.catalog[3].hash : '';
     return [
-      { n: 1, title: 'Create a segment', name: 'POST /v1/segments', method: 'POST', path: '/v1/segments', token: 'tok_priya_adops', body: { name: 'GlowRoot Monsoon Care', advertiser_id: 'adv_glowroot', rule: rule },
-        what: 'Creates a targeting segment as version 1, in draft. The rule is checked before it is saved, and any audience condition gets a consent tag automatically.',
+      { n: 1, title: 'Create a segment', name: 'POST /v1/segments', method: 'POST', path: '/v1/segments', token: 'tok_priya_adops', body: { name: 'GlowRoot Monsoon Care', advertiser_id: 'adv_glowroot', deal_ids: ['MN-GLOW-MONSOON'], rule: rule },
+        what: 'Creates a targeting segment as version 1, in draft, bound to the Deal IDs it serves. The rule is checked before it is saved, and any audience condition gets a consent tag automatically.',
         who: 'AdOps', pain: 'A', why: 'Most wrong rules start as a typo or a missing condition. Catching them at creation is the cheapest fix there is.',
         mvp: 'Yes, weeks 1 to 2.',
-        look: 'Status "draft", a fingerprint, and the warning that the audience rule now needs consent. Nothing is live yet. Send it twice and the second call gets 409: a change to an existing segment must be a new version.',
+        look: 'Status "draft", a fingerprint, the deal_ids, and the warning that the audience rule now needs consent. Nothing is live yet. Send it twice and the second call gets 409: a change to an existing segment must be a new version.',
         alts: [
           { label: 'A typo in a field name', body: { name: 'GlowRoot Typo Test', advertiser_id: 'adv_glowroot', rule: typo }, look: '400 with "Did you mean device.geo.region?" and the exact path of the mistake. The rule is never saved.' },
           { label: 'Write for another advertiser', body: { name: 'Not my client', advertiser_id: 'adv_other', rule: rule }, look: '403 forbidden_advertiser. Each team can only write segments for its own advertisers.' }
         ] },
       { n: 2, title: 'Add a version', name: 'POST /v1/segments/{id}/versions', method: 'POST', path: seg + '/versions', token: 'tok_priya_adops', body: { rule: rule },
-        what: 'Adds a new version of an existing segment. There is no edit: earlier versions are never overwritten.',
-        who: 'AdOps', pain: 'A', why: 'When every change is a new version, any complaint can be traced to the exact rule that served, and going back is one step.',
+        what: 'Adds a new version of an existing segment. There is no edit: earlier versions are never overwritten. Deal IDs carry over unless deal_ids is sent.',
+        who: 'AdOps', pain: 'A', why: 'When every change is a new version, any complaint can be traced to the exact rule that was live, and going back is one step.',
         mvp: 'Yes, weeks 1 to 2.',
         look: 'A new version number, in draft. The live version (v3) does not change until a second person approves and publishes.',
         alts: [
           { label: 'An approver tries to write a rule', token: 'tok_rahul_approver', look: '403. Approvers review rules, they do not write them. Keeping the two roles apart is what makes the second check real.' }
         ] },
-      { n: 3, title: 'Check a segment and its sync', name: 'GET /v1/segments/{id}?include=sync', method: 'GET', path: seg + '?include=sync', token: 'tok_priya_adops',
-        what: 'Shows the live version and its history, and for each ad server whether it runs the live version, an older one, or has gone quiet.',
-        who: 'AdOps, approvers, reporting', pain: 'B', why: 'Today, "is my change live everywhere?" is a question someone has to chase. Here it is one request.',
-        mvp: 'Yes. Versions in weeks 1 to 2, the sync view in week 4.',
-        look: 'The "sync" list at the bottom. Each server is in sync, stale (narrower or wider than the live rule) or unknown, with a risk level.',
+      { n: 3, title: 'Change an exclusion list', name: 'POST /v1/lists/{name}/versions', method: 'POST', path: '/v1/lists/excl_buyer_blocklist/versions', token: 'tok_priya_adops', body: { add: ['new-spam.example'], reason: 'Buyer flagged the site as off-brand' },
+        what: 'Adds or removes sites on a list that segments point to. The segments do not get new versions; their effective fingerprints change, and the change ships as a new catalog revision.',
+        who: 'AdOps, on the buyer\'s request', pain: 'AB', why: 'The incident in this case is a list change, not a segment change. Adding a site can only narrow reach, so one person may publish it. Removing one widens reach, so it waits for an approver.',
+        mvp: 'Yes, weeks 1 to 2, with segments.',
+        look: '201, "status": "active", a new catalog_rev, and affected_segments: both GlowRoot segments use this list.',
         alts: [
-          { label: "Another advertiser's writer asks", token: 'tok_other_writer', look: '404, not 403. A team cannot even learn that another advertiser\'s segment exists.' }
+          { label: 'Remove a site', body: { remove: ['viral-feed.example'], reason: 'Buyer unblocked the site' }, look: '202 "waiting_for_approval". Nothing changes until an approver who is not you calls POST /v1/lists/excl_buyer_blocklist/transitions with {"action": "approve"}.' },
+          { label: "Another advertiser's list", token: 'tok_other_writer', look: '404. A team cannot see another advertiser\'s list.' }
         ] },
-      { n: 4, title: 'Pull the catalog', name: 'GET /v1/catalog/snapshot', method: 'GET', path: '/v1/catalog/snapshot?since_rev=' + Math.max(0, last.rev - 2), token: 'tok_edge_us_1',
-        what: 'The bundle ad servers pull: every live segment and list, signed, carrying only what changed since the revision the server already holds.',
+      { n: 4, title: 'Approve, publish, roll back, stop', name: 'POST /v1/segments/{id}/transitions', method: 'POST', path: seg + '/transitions', token: 'tok_priya_adops', body: { action: 'pause', reason: 'Client escalation, stop while we check' },
+        what: 'Submit, approve, publish, roll back, pause (stop everywhere) and resume. One rule decides who may act alone: anything that can only stop or narrow delivery needs one person and a reason. Anything that can widen reach, or bring in content nobody reviewed, needs a second person.',
+        who: 'AdOps and approvers', pain: 'AB', why: 'Submit returns the impact of a change in plain words. Stop is the human kill switch: it lands in the head, so every server stops the segment within 30 seconds, even one whose reload is failing.',
+        mvp: 'Yes, week 5.',
+        look: '"stopped_everywhere", acting alone as Priya. Then try Resume as Priya: it is refused, because resuming restores reach. Press Reset demo afterwards.',
+        alts: [
+          { label: 'Resume as Priya', body: { action: 'resume', reason: 'Checked, all clear' }, look: '403 for a writer, or 409 if the segment is not stopped. Resuming restores reach, so it needs an approver.' },
+          { label: 'AdOps tries to approve', body: { action: 'approve', version: 3 }, look: '403. Only an approver can approve, and never a version they created. The rollback limits (a writer cannot widen reach, nobody can loosen consent) are proven in the Tests tab.' }
+        ] },
+      { n: 5, title: 'Read the head', name: 'GET /v1/catalog/head', method: 'GET', path: '/v1/catalog/head', token: 'tok_edge_sg_1',
+        what: 'The small signed document every server reads every 30 seconds: the current revision, segments stopped everywhere, and for each segment what a server must do if it holds an older copy and cannot catch up.',
+        who: 'Ad servers and the deal tagger. In production it is mirrored to object storage.', pain: 'B', why: 'This is how stops reach a server without the hub sending commands. The hub decides the rule once, at publish time. The server enforces it, even while its reload is failing, and a hub API outage does not stop anyone reading it.',
+        mvp: 'Yes, week 3.',
+        look: 'Under segments, seg_glowroot_premium_north, if_holding_older: the copy edge_sg_1 holds is "held_copy": "wider", "on_server": "stop_after", "after_seconds": 900. Festive East is standard, so a wider copy there only drops audience tiers after 4 hours.',
+        alts: [
+          { label: 'Read it from object storage', path: '/v1/catalog/objects/head.json', token: 'tok_edge_us_1', look: 'The same signed head, with no token needed. This is the copy servers read, so they keep working while the hub API is down.' }
+        ] },
+      { n: 6, title: 'Pull the catalog', name: 'GET /v1/catalog/snapshot', method: 'GET', path: '/v1/catalog/snapshot?since_rev=' + Math.max(0, last.rev - 2), token: 'tok_edge_us_1',
+        what: 'The bundle a server pulls when the head says it is behind: every live segment, its deals and lists, signed, carrying only what changed since the revision it holds.',
         who: 'Ad servers and the deal tagger. People cannot call it.', pain: 'B', why: 'Servers pull on their own schedule and never call the hub while bidding. The hub can be down without slowing a single auction.',
         mvp: 'Yes, week 3.',
-        look: '"full": false and only the segments that changed since that revision. The "hash" is what the server reports back in step 7.',
+        look: '"full": false and only what changed since that revision. The "hash" is what the server reports back in step 7.',
         alts: [
           { label: 'Cold start, nothing held yet', path: '/v1/catalog/snapshot', look: 'Instead of a huge response, a short-lived signed link to the full copy in storage.' },
           { label: 'AdOps tries to pull it', token: 'tok_priya_adops', look: '403. Only machines read the bundle.' }
         ] },
-      { n: 5, title: 'Move a segment through approval', name: 'POST /v1/segments/{id}/transitions', method: 'POST', path: seg + '/transitions', token: 'tok_rahul_approver', body: { action: 'pause', reason: 'Stale wider copies found' },
-        what: 'Submit, approve, publish, roll back, pause, resume. Approve and publish need a second person. Submit returns the impact of the change in plain words.',
-        who: 'AdOps and approvers', pain: 'AB', why: 'This is where the core rule lives. A server holding a narrower old copy only under-delivers, so it is never paused. A wider copy can serve outside the target, so only that one is paused.',
-        mvp: 'Yes, week 5. Automatic pause enforcement comes after the pilot.',
-        look: '"pending" lists only edge_sg_1, the server with a wider copy. edge_mum_1 holds a narrower copy and is skipped with "alert and refresh instead of pausing". deal_tagger_1 never reported, so it is probed, not paused.',
-        alts: [
-          { label: 'AdOps tries to approve', token: 'tok_priya_adops', body: { action: 'approve', version: 3 }, look: '403. Only an approver can approve, and never a version they created. The rollback limits (a writer cannot widen reach, nobody can loosen consent) are proven in the Tests tab, under "Roles, four-eyes, tenant isolation".' }
-        ] },
-      { n: 6, title: 'Test a request', name: 'POST /v1/match', method: 'POST', path: '/v1/match?catalog_rev=3&compare=active', token: 'tok_priya_adops', body: bid(function (r) { r.device.geo.region = 'IN-DL'; r.site.domain = 'glow-deals-feed.example'; }),
-        what: 'Takes a sample bid request and says which segments it matches, at which tier, and why, clause by clause. It can replay the request against an older revision.',
-        who: 'AdOps, support, anyone checking a complaint', pain: 'AB', why: 'When a client asks "why did my ad show here?", this answers for the rule that was live at the time, not the rule live today.',
-        mvp: 'Yes, as the dry run in week 5. Ad servers keep their own matching. This is the reference, not the bid path.',
-        look: 'Under "compare": at revision 3 this request matched premium_north, but under today\'s rule the site is on the exclusion list. "diverges": true is exactly what a server still on revision 3 would get wrong.',
-        alts: [
-          { label: 'Same user, no consent', path: '/v1/match', body: bid(function (r) { delete r.regs; }), look: 'Tier 2, context only. Without a consent string the audience signal is ignored and the segment falls back to content category. The hub reads consent from user.consent, then user.ext.consent (OpenRTB 2.5), then regs.gpp.' }
-        ] },
-      { n: 7, title: 'Confirm what a server runs', name: 'POST /v1/consumers/{id}/acks', method: 'POST', path: '/v1/consumers/edge_us_1/acks', token: 'tok_edge_us_1', body: { catalog_rev: last.rev, hash: last.hash, state: 'active', exceptions: [] },
-        what: 'An ad server reports which revision it holds, and whether it has received it, accepted it, or is actually serving it.',
+      { n: 7, title: 'Report what a server runs', name: 'POST /v1/consumers/{id}/acks', method: 'POST', path: '/v1/consumers/edge_us_1/acks', token: 'tok_edge_us_1', body: { catalog_rev: last.rev, hash: last.hash, state: 'active', head_rev: last.rev, exceptions: [], locally_stopped: [] },
+        what: 'A server reports the revision it holds, whether it received, accepted or is actually serving it, the newest head it has read, and any segment it has stopped on its own.',
         who: 'Ad servers and the deal tagger', pain: 'B', why: 'Only "active" counts as in sync. "Sent" is not the same as "serving", and that gap is the whole problem. These reports are also the only input the pilot metric needs.',
         mvp: 'Yes, week 4.',
-        look: '"counts_as_in_sync": true and "behind_by": 0.',
+        look: '"counts_as_in_sync": true, "behind_by": 0, "sync_required": false.',
         alts: [
+          { label: 'A server on an old revision', path: '/v1/consumers/edge_sg_1/acks', token: 'tok_edge_sg_1', body: { catalog_rev: 3, hash: rev3, state: 'active', head_rev: last.rev, exceptions: [{ error: 'apply_failed' }], locally_stopped: [] }, look: '"sync_required": true and "stale_detail": for Premium North the held copy is wider and "on_server" shows the deadline the server is counting down to. There is no pause or stop command in the reply: the server already has its rule from the head.' },
           { label: 'Report for a different server', path: '/v1/consumers/edge_mum_1/acks', look: '403. A server\'s identity comes from its token, not from what it claims in the body.' },
-          { label: 'A server on an old revision', path: '/v1/consumers/edge_sg_1/acks', token: 'tok_edge_sg_1', body: { catalog_rev: 3, hash: (d && d.catalog[3] ? d.catalog[3].hash : ''), state: 'active', exceptions: [] }, look: '"counts_as_in_sync": false, "behind_by": 2, and "stale_detail" names each segment it holds out of date, the risk, and the recommended action. Singapore missed the blocklist update, so its copies are wider and get a pause request.' },
           { label: 'Report a wrong hash', body: { catalog_rev: last.rev, hash: 'deadbeef', state: 'active', exceptions: [] }, look: '409. The server is told its copy is corrupt and to pull it again.' }
+        ] },
+      { n: 8, title: 'Check a segment and its sync', name: 'GET /v1/segments/{id}?include=sync', method: 'GET', path: '/v1/segments/seg_glowroot_premium_north?include=sync', token: 'tok_priya_adops',
+        what: 'Shows the live version, its deals and history, and for each server whether it runs the live version, an older one, or has gone quiet, what that server will do on its own, and what the hub recommends.',
+        who: 'AdOps, approvers, reporting', pain: 'B', why: 'Today, "is my change live everywhere?" is a question someone has to chase. Here it is one request, per server, not per cluster.',
+        mvp: 'Yes. Versions in weeks 1 to 2, the sync view in week 4.',
+        look: 'In "sync.summary.clusters", Singapore has 2 of 3 in sync and "hides_a_problem": true. In "sync.consumers", edge_sg_1 has "held_copy": "wider" and an "on_server" deadline.',
+        alts: [
+          { label: "Another advertiser's writer asks", token: 'tok_other_writer', look: '404, not 403. A team cannot even learn that another advertiser\'s segment exists.' }
+        ] },
+      { n: 9, title: 'Test a request', name: 'POST /v1/match', method: 'POST', path: '/v1/match?catalog_rev=3&compare=active', token: 'tok_priya_adops', body: bid(function (r) { r.device.geo.region = 'IN-DL'; r.site.domain = 'glow-deals-feed.example'; }),
+        what: 'Takes a sample bid request and says which segments and deals it is eligible for, at which tier, and why, clause by clause. It can replay the request against an older revision.',
+        who: 'AdOps, support, anyone checking a complaint', pain: 'AB', why: 'When a client asks "why was my deal eligible here?", this answers for the rule that was live at the time, not the rule live today.',
+        mvp: 'Yes, as the dry run in week 5. Ad servers keep their own matching. This is the reference, not the bid path, and shared test cases keep the two in step.',
+        look: 'Under "compare": at revision 3 this request is eligible for Premium North, but under today\'s rule the site is excluded. "diverges": true is exactly what a server still on revision 3 gets wrong.',
+        alts: [
+          { label: 'Same user, no consent', path: '/v1/match', body: bid(function (r) { delete r.regs; }), look: 'Tier 2, context only. Without a consent string the audience signal is ignored and the segment falls back to content category. The hub reads consent from user.consent, then user.ext.consent (OpenRTB 2.5), then regs.gpp.' }
         ] }
     ];
   }
@@ -565,7 +719,7 @@ body.logopen main{padding-bottom:56vh}
   function renderApi(v) {
     v.append(h('h2', {}, 'API explorer'),
       h('div', { class: 'verdict info', style: 'font-weight:400' }, h('b', {}, 'How to use this. '),
-        'Seven endpoints, roughly in the order a segment lives: create it, version it, check it, ship it to ad servers, approve it, test it, and confirm it is serving. Each one is pre-filled. Press Send, then read "Look for". Start at 1, or jump to 5 to see the core rule: only risky stale copies get paused. "Reset demo" at the top puts everything back.'));
+        'Nine endpoints, in the order a change travels: author it (1 to 3), approve it (4), distribute it (5 and 6), confirm it (7 and 8), and test it (9). Each one is pre-filled. Press Send, then read "Look for". Jump to 5 to see how a server learns what to stop without the hub sending a command. "Reset demo" at the top puts everything back.'));
     var P = presets();
     if (!state.explorer) loadCase(P[0], null, true);
     var e = state.explorer, g = P.filter(function (p) { return p.n === e.n; })[0] || P[0];
@@ -601,6 +755,7 @@ body.logopen main{padding-bottom:56vh}
       v.append(h('div', { class: 'card' }, h('div', { class: 'row' }, chip(r.status, r.status < 300 ? 'good' : r.status < 400 ? 'info' : 'bad'), h('span', { class: 'muted small' }, r.ms + ' ms'),
         r.headers.etag ? h('span', { class: 'mono small' }, 'ETag ' + r.headers.etag) : null, r.headers.location ? h('span', { class: 'mono small' }, 'Location ' + r.headers.location) : null,
         r.redirected ? h('span', { class: 'muted small' }, 'redirect followed to ' + r.url.replace(location.origin, '')) : null, r.headers['idempotent-replay'] ? chip('idempotent replay', 'info') : null),
+        r.status >= 500 ? h('div', { style: 'margin-top:6px' }, chroma('exres', r.status === 503 ? 'maintenance' : 'error', { line: r.status === 503 ? 'The hub is down. Servers keep reading the head from object storage.' : 'Something went wrong on our side. The response below says what.' })) : null,
         pre(r.body === null ? '(empty body)' : r.body)));
     }
     v.append(h('details', { class: 'card' }, h('summary', {}, 'Demo tokens'), h('table', {}, h('tr', {}, ['Token', 'Role'].map(function (x) { return h('th', {}, x); })),
@@ -626,7 +781,8 @@ body.logopen main{padding-bottom:56vh}
     } }, state.tests ? 'Run again' : 'Run all tests'));
     if (state.tests) {
       var pass = state.tests.filter(function (t) { return t.ok; }).length;
-      box.append(h('div', { class: 'verdict ' + (pass === state.tests.length ? 'good' : 'bad') }, pass + ' of ' + state.tests.length + ' passed'));
+      box.append(h('div', { class: 'row' }, h('div', { class: 'verdict ' + (pass === state.tests.length ? 'good' : 'bad'), style: 'flex:1' }, pass + ' of ' + state.tests.length + ' passed'),
+        pass === state.tests.length ? chroma('tests', 'validated', { line: 'Friends don\'t let friends deploy unvalidated rules.' }) : chroma('tests', 'invalid', { line: 'Something failed. The test names below say what.' })));
       var groups = {}; state.tests.forEach(function (t) { (groups[t.group] = groups[t.group] || []).push(t); });
       Object.keys(groups).forEach(function (g) {
         var items = groups[g], ok = items.filter(function (t) { return t.ok; }).length;
@@ -654,9 +810,16 @@ body.logopen main{padding-bottom:56vh}
   // ---------------------------------------------------------------- main
   function render() {
     var v = document.getElementById('view'); v.innerHTML = '';
-    ({ about: renderAbout, story: renderStory, segments: renderSegments, sync: renderSync, api: renderApi, tests: renderTests })[state.tab](v);
+    try { ({ about: renderAbout, story: renderStory, segments: renderSegments, sync: renderSync, api: renderApi, tests: renderTests })[state.tab](v); }
+    catch (e) {
+      v.innerHTML = '';
+      v.append(h('div', { class: 'card' }, h('div', { class: 'row' }, chroma('crash', 'error', { size: 'md' }),
+        h('div', {}, h('b', {}, 'This view could not be drawn.'), h('div', { class: 'muted small mono' }, String(e && e.message || e)),
+          h('div', { class: 'muted small' }, 'The API is unaffected. Press "Reset demo" at the top, or open another tab.')))));
+      if (window.console) console.error(e);
+    }
   }
-  document.getElementById('actor').addEventListener('change', async function (e) { state.token = e.target.value; await loadSegments(); await loadSync(); render(); });
+  document.getElementById('actor').addEventListener('change', async function (e) { state.token = e.target.value; state.segId = null; state.seg = null; state.builder = ''; state.radius = null; await loadSegments(); await loadSync(); render(); });
   document.getElementById('reset').addEventListener('click', async function () {
     await api('POST', '/v1/demo/reset', { token: null });
     state.scen = {}; state.replay = null; state.radius = null; state.builder = ''; state.segId = null; state.exRes = null; state.builderErr = null;

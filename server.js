@@ -15,7 +15,9 @@ const STATIC = {
   '/suite.js': ['test/suite.js', 'application/javascript; charset=utf-8'],
   '/about.js': ['public/about.js', 'application/javascript; charset=utf-8'],
   '/about.md': ['public/about.md', 'text/markdown; charset=utf-8'],
-  '/assets/sid-avatar.svg': ['public/assets/sid-avatar.svg', 'image/svg+xml']
+  '/assets/sid-avatar.svg': ['public/assets/sid-avatar.svg', 'image/svg+xml'],
+  '/docs': ['public/docs.html', 'text/html; charset=utf-8'],
+  '/openapi.json': ['public/openapi.json', 'application/json; charset=utf-8']
 };
 
 // Very small per-IP rate limit so a public prototype cannot be hammered.
@@ -46,6 +48,10 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && STATIC[url.pathname]) {
     const [file, type] = STATIC[url.pathname];
     return fs.readFile(path.join(__dirname, file), (err, data) => err ? send(res, 404, { 'content-type': 'text/plain' }, 'not found') : send(res, 200, { 'content-type': type, 'cache-control': 'no-cache' }, data));
+  }
+  const art = /^\/assets\/chroma\/([a-z_]+)\.webp$/.exec(url.pathname);
+  if (req.method === 'GET' && art) {
+    return fs.readFile(path.join(__dirname, 'public/assets/chroma', art[1] + '.webp'), (err, data) => err ? send(res, 404, { 'content-type': 'text/plain' }, 'not found') : send(res, 200, { 'content-type': 'image/webp', 'cache-control': 'public, max-age=86400' }, data));
   }
   if (limited(ip)) return send(res, 429, { 'content-type': 'application/json' }, JSON.stringify({ error: 'rate_limited', message: 'Too many requests. Slow down' }));
   const chunks = []; let size = 0, tooBig = false;

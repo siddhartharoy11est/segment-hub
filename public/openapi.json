@@ -1,0 +1,1151 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Segment Hub API",
+    "version": "1.0.0-prototype",
+    "description": "Internal control-plane API for targeting segments behind curated deals. Prototype for the Media.net APM case, Topic 3. Not an official Media.net API. The hub is never called during the auction: servers read a small signed head, pull signed snapshots, match locally, and report what they serve. One rule decides who may act alone: anything that can only stop or narrow delivery needs one person and a reason; anything that can widen reach needs a second person."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Demo tokens identify people (writer, approver, reader, admin) and machines (one per server instance). Production: OAuth2 client credentials or mutual TLS for machines, the company identity provider for people."
+      }
+    }
+  },
+  "security": [
+    {
+      "bearer": []
+    }
+  ],
+  "x-errors": {
+    "format": {
+      "error": "machine_code",
+      "message": "human sentence",
+      "path": "where in the body, when relevant"
+    },
+    "codes": {
+      "400": "invalid body or rule, with a did-you-mean where possible",
+      "401": "no or unknown token",
+      "403": "role or four-eyes refusal",
+      "404": "not found, or not visible to your advertiser",
+      "409": "wrong state, duplicate, or corrupt copy (hash mismatch)",
+      "413": "rule too large",
+      "422": "idempotency key reused with a different body",
+      "429": "rate or prototype limit",
+      "503": "hub API down; the head stays readable from object storage"
+    }
+  },
+  "paths": {
+    "/v1/segments": {
+      "post": {
+        "summary": "Create a segment",
+        "description": "Creates version 1 in draft, bound to its Deal IDs. The rule is validated before it is saved; audience conditions get a consent tag.",
+        "tags": [
+          "Author"
+        ],
+        "x-who-calls": "AdOps (writer)",
+        "responses": {
+          "201": {
+            "description": "Example from the seeded demo",
+            "content": {
+              "application/json": {
+                "example": {
+                  "segment_id": "seg_glowroot_monsoon_care",
+                  "version": 1,
+                  "status": "draft",
+                  "fingerprint": "547a978d",
+                  "deal_ids": [
+                    "MN-GLOW-MONSOON"
+                  ],
+                  "validation": {
+                    "valid": true,
+                    "warnings": [
+                      "audience.purchase_skincare_30d needs consent: tag added automatically"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "createSegment typo",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "invalid_rule",
+                  "message": "Unknown field 'device.geo.regoin'. Did you mean 'device.geo.region'?",
+                  "rule_index": 0,
+                  "path": "must[0].field",
+                  "details": [
+                    {
+                      "error": "invalid_rule",
+                      "message": "Unknown field 'device.geo.regoin'. Did you mean 'device.geo.region'?",
+                      "path": "must[0].field",
+                      "suggestion": "device.geo.region"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {
+                "name": "GlowRoot Monsoon Care",
+                "advertiser_id": "adv_glowroot",
+                "deal_ids": [
+                  "MN-GLOW-MONSOON"
+                ],
+                "rule": {
+                  "must": [
+                    {
+                      "field": "device.geo.region",
+                      "in": [
+                        "IN-WB",
+                        "IN-OD"
+                      ]
+                    },
+                    {
+                      "field": "device.type",
+                      "in": [
+                        "mobile"
+                      ]
+                    },
+                    {
+                      "field": "site.domain",
+                      "not_in_list": "excl_buyer_blocklist"
+                    }
+                  ],
+                  "should": [
+                    {
+                      "tier": 1,
+                      "all": [
+                        {
+                          "field": "audience.purchase_skincare_30d",
+                          "eq": true
+                        },
+                        {
+                          "field": "site.cat",
+                          "in": [
+                            "IAB18-1"
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "tier": 2,
+                      "all": [
+                        {
+                          "field": "site.cat",
+                          "in": [
+                            "IAB18-1"
+                          ]
+                        }
+                      ]
+                    }
+                  ],
+                  "if_audience_missing": "fall_back_to_context"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Replays the first response for the same key and body. A different body with the same key is refused with 422."
+          }
+        ]
+      }
+    },
+    "/v1/segments/{id}/versions": {
+      "post": {
+        "summary": "Add a version",
+        "description": "Versions are immutable. Deal IDs carry over unless deal_ids is sent.",
+        "tags": [
+          "Author"
+        ],
+        "x-who-calls": "AdOps (writer)",
+        "responses": {
+          "201": {
+            "description": "Example from the seeded demo",
+            "content": {
+              "application/json": {
+                "example": {
+                  "segment_id": "seg_glowroot_monsoon_care",
+                  "version": 2,
+                  "status": "draft",
+                  "fingerprint": "ae7e66ac",
+                  "deal_ids": [
+                    "MN-GLOW-MONSOON"
+                  ],
+                  "validation": {
+                    "valid": true,
+                    "warnings": [
+                      "audience.purchase_skincare_30d needs consent: tag added automatically"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {
+                "rule": {
+                  "must": [
+                    {
+                      "field": "device.geo.region",
+                      "in": [
+                        "IN-WB"
+                      ]
+                    },
+                    {
+                      "field": "device.type",
+                      "in": [
+                        "mobile"
+                      ]
+                    },
+                    {
+                      "field": "site.domain",
+                      "not_in_list": "excl_buyer_blocklist"
+                    }
+                  ],
+                  "should": [
+                    {
+                      "tier": 1,
+                      "all": [
+                        {
+                          "field": "audience.purchase_skincare_30d",
+                          "eq": true
+                        },
+                        {
+                          "field": "site.cat",
+                          "in": [
+                            "IAB18-1"
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "tier": 2,
+                      "all": [
+                        {
+                          "field": "site.cat",
+                          "in": [
+                            "IAB18-1"
+                          ]
+                        }
+                      ]
+                    }
+                  ],
+                  "if_audience_missing": "fall_back_to_context"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Replays the first response for the same key and body. A different body with the same key is refused with 422."
+          }
+        ]
+      }
+    },
+    "/v1/lists/{name}": {
+      "get": {
+        "summary": "Read an exclusion list",
+        "description": "Current domains, history, and any change waiting for approval.",
+        "tags": [
+          "Author"
+        ],
+        "x-who-calls": "AdOps, approvers, readers",
+        "responses": {
+          "200": {
+            "description": "Example from the seeded demo",
+            "content": {
+              "application/json": {
+                "example": {
+                  "name": "excl_buyer_blocklist",
+                  "advertiser_id": "adv_glowroot",
+                  "version": 4,
+                  "domains": [
+                    "cheap-clicks.example",
+                    "glow-deals-feed.example",
+                    "new-spam.example"
+                  ],
+                  "used_by": [
+                    "seg_glowroot_festive_east",
+                    "seg_glowroot_premium_north"
+                  ],
+                  "versions": [
+                    {
+                      "version": 1,
+                      "created_by": "seed",
+                      "approved_by": null,
+                      "created_at": "2026-11-24T15:16:08.993Z",
+                      "added": [],
+                      "removed": [],
+                      "reason": "Buyer blocklist at launch"
+                    },
+                    {
+                      "version": 2,
+                      "created_by": "priya",
+                      "approved_by": null,
+                      "created_at": "2026-11-24T21:11:09.028Z",
+                      "added": [
+                        "glow-deals-feed.example"
+                      ],
+                      "removed": [],
+                      "reason": "Buyer reported glow-deals-feed.example as off-brand"
+                    },
+                    {
+                      "version": 3,
+                      "created_by": "priya",
+                      "approved_by": null,
+                      "created_at": "2026-11-24T21:16:09.056Z",
+                      "added": [
+                        "new-spam.example"
+                      ],
+                      "removed": [],
+                      "reason": "Buyer flagged the site as off-brand"
+                    }
+                  ],
+                  "pending": null
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/lists/{name}/versions": {
+      "post": {
+        "summary": "Change an exclusion list",
+        "description": "Adding sites narrows reach, so it publishes at once with one person and a reason (201). Removing a site widens reach, so it waits for an approver (202).",
+        "tags": [
+          "Author"
+        ],
+        "x-who-calls": "AdOps (writer)",
+        "responses": {
+          "201": {
+            "description": "Example from the seeded demo",
+            "content": {
+              "application/json": {
+                "example": {
+                  "list": "excl_buyer_blocklist",
+                  "version": 3,
+                  "status": "active",
+                  "catalog_rev": 6,
+                  "affected_segments": [
+                    {
+                      "segment_id": "seg_glowroot_festive_east",
+                      "new_effective_fingerprint": "38218f9b",
+                      "previous": "4e64b9d1"
+                    },
+                    {
+                      "segment_id": "seg_glowroot_premium_north",
+                      "new_effective_fingerprint": "3f50fb78",
+                      "previous": "b1d79b13"
+                    }
+                  ],
+                  "review": "Adding sites only narrows reach, so one person may publish it with a reason. Removing a site needs an approver."
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "listRemove",
+            "content": {
+              "application/json": {
+                "example": {
+                  "list": "excl_buyer_blocklist",
+                  "status": "waiting_for_approval",
+                  "pending": {
+                    "add": [],
+                    "remove": [
+                      "viral-feed.example"
+                    ],
+                    "created_by": "priya",
+                    "created_at": "2026-11-24T21:16:09.064Z",
+                    "reason": "Buyer unblocked the site"
+                  },
+                  "next": "approve, by someone other than priya",
+                  "why": "Removing a site from an exclusion list widens reach, so a second person must approve it."
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {
+                "add": [
+                  "new-spam.example"
+                ],
+                "reason": "Buyer flagged the site as off-brand"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Replays the first response for the same key and body. A different body with the same key is refused with 422."
+          }
+        ]
+      }
+    },
+    "/v1/lists/{name}/transitions": {
+      "post": {
+        "summary": "Approve or reject a list change",
+        "description": "By an approver who did not propose it.",
+        "tags": [
+          "Approve"
+        ],
+        "x-who-calls": "Approver",
+        "responses": {
+          "200": {
+            "description": "Example from the seeded demo",
+            "content": {
+              "application/json": {
+                "example": {
+                  "list": "excl_buyer_blocklist",
+                  "version": 4,
+                  "status": "active",
+                  "catalog_rev": 7,
+                  "affected_segments": [
+                    {
+                      "segment_id": "seg_glowroot_festive_east",
+                      "new_effective_fingerprint": "db3738a7",
+                      "previous": "38218f9b"
+                    },
+                    {
+                      "segment_id": "seg_glowroot_premium_north",
+                      "new_effective_fingerprint": "683090d4",
+                      "previous": "3f50fb78"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {
+                "action": "approve"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/segments/{id}/transitions": {
+      "post": {
+        "summary": "Move a segment through its lifecycle",
+        "description": "submit, approve, publish, rollback, pause (stop everywhere), resume. Submit returns the blast radius. Approve, publish and resume need an approver who did not create the version; pause and a rollback that is not wider may be done by one person with a reason.",
+        "tags": [
+          "Approve"
+        ],
+        "x-who-calls": "AdOps and approvers",
+        "responses": {
+          "200": {
+            "description": "pause",
+            "content": {
+              "application/json": {
+                "example": {
+                  "segment_id": "seg_glowroot_festive_east",
+                  "status": "stopped_everywhere",
+                  "catalog_rev": 8,
+                  "how": "The segment is now on the revoked list in the head. Every server stops it on its next head read, within 30 seconds, even a server whose reload is failing.",
+                  "not_yet_confirmed": [],
+                  "next": "resume needs an approver, because it restores reach"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "resume writer",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "forbidden",
+                  "message": "Role 'writer' cannot do this. Needs: approver or admin"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {
+                "action": "submit",
+                "version": 2
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Replays the first response for the same key and body. A different body with the same key is refused with 422."
+          }
+        ]
+      }
+    },
+    "/v1/catalog/head": {
+      "get": {
+        "summary": "Read the head",
+        "description": "A small signed document every server reads every 30 seconds: current revision, revoked segments, and for each segment what a server must do if it holds an older copy (on_server, after_seconds). Mirrored at /v1/catalog/objects/head.json, readable without a token.",
+        "tags": [
+          "Distribute"
+        ],
+        "x-who-calls": "Ad servers and the deal tagger",
+        "responses": {
+          "200": {
+            "description": "Example from the seeded demo",
+            "content": {
+              "application/json": {
+                "example": {
+                  "catalog_rev": 7,
+                  "hash": "42ac4889",
+                  "published_at": "2026-11-24T21:16:09.064Z",
+                  "revoked": [],
+                  "segments": {
+                    "seg_glowroot_festive_east": {
+                      "fingerprint": "db3738a7",
+                      "deal_ids": [
+                        "MN-GLOW-FESTIVE-E"
+                      ],
+                      "expiry_class": "standard",
+                      "if_holding_older": [
+                        {
+                          "fingerprint": "38218f9b",
+                          "held_copy": "narrower",
+                          "on_server": "keep_serving",
+                          "after_seconds": null
+                        },
+                        {
+                          "fingerprint": "4e64b9d1",
+                          "held_copy": "mixed",
+                          "on_server": "context_only_after",
+                          "after_seconds": 14400
+                        }
+                      ],
+                      "if_holding_unknown": {
+                        "held_copy": "unknown",
+                        "on_server": "context_only_after",
+                        "after_seconds": 14400
+                      }
+                    },
+                    "seg_glowroot_premium_north": {
+                      "fingerprint": "683090d4",
+                      "deal_ids": [
+                        "MN-GLOW-PREMIUM-N"
+                      ],
+                      "expiry_class": "strict",
+                      "if_holding_older": [
+                        {
+                          "fingerprint": "3f50fb78",
+                          "held_copy": "narrower",
+                          "on_server": "keep_serving",
+                          "after_seconds": null
+                        },
+                        {
+                          "fingerprint": "b1d79b13",
+                          "held_copy": "mixed",
+                          "on_server": "stop_after",
+                          "after_seconds": 900
+                        }
+                      ],
+                      "if_holding_unknown": {
+                        "held_copy": "unknown",
+                        "on_server": "stop_after",
+                        "after_seconds": 900
+                      }
+                    }
+                  },
+                  "lease_seconds": {
+                    "strict": 900,
+                    "standard": 14400
+                  },
+                  "heartbeat_seconds": 30,
+                  "rules_for_servers": [
+                    "Read this head every 30 seconds. In production it is mirrored to object storage, so it stays readable when the hub API is down.",
+                    "If catalog_rev is newer than the revision you serve, pull the snapshot and apply it.",
+                    "Stop any segment in revoked at once."
+                  ],
+                  "signature": "sig_a170c6f4870039e2"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/catalog/snapshot": {
+      "get": {
+        "summary": "Pull the catalog",
+        "description": "Signed delta since a revision, with ETag (If-None-Match returns 304). A cold start or a too-old revision returns a manifest to a signed object-store copy instead.",
+        "tags": [
+          "Distribute"
+        ],
+        "x-who-calls": "Ad servers and the deal tagger",
+        "responses": {
+          "200": {
+            "description": "snapshot cold",
+            "content": {
+              "application/json": {
+                "example": {
+                  "mode": "object_url",
+                  "reason": "cold start",
+                  "catalog_rev": 7,
+                  "url": "/v1/catalog/objects/rev-7.json?exp=1795555269070&sig=sig_fc793b77d6a2e75b",
+                  "expires_at": "2026-11-24T21:21:09.070Z",
+                  "body_digest": "b0fb6f98"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "since_rev",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/consumers/{id}/acks": {
+      "post": {
+        "summary": "Report what a server runs",
+        "description": "The server identity comes from its token, never the body. Only state active at the current revision counts as in sync. The reply says sync_required; it never contains a stop command.",
+        "tags": [
+          "Observe"
+        ],
+        "x-who-calls": "Ad servers and the deal tagger",
+        "responses": {
+          "200": {
+            "description": "Example from the seeded demo",
+            "content": {
+              "application/json": {
+                "example": {
+                  "consumer_id": "edge_sg_1",
+                  "recorded": {
+                    "received_rev": 7,
+                    "accepted_rev": 3,
+                    "active_rev": 3
+                  },
+                  "current_catalog_rev": 7,
+                  "counts_as_in_sync": false,
+                  "behind_by": 4,
+                  "sync_required": true,
+                  "stale_detail": [
+                    {
+                      "segment_id": "seg_glowroot_festive_east",
+                      "held_version": 2,
+                      "held_copy": "mixed",
+                      "risk": "high",
+                      "on_server": {
+                        "action": "context_only_after",
+                        "learned_at": "2026-11-24T21:11:39.029Z",
+                        "stop_at": "2026-11-25T01:11:39.029Z",
+                        "seconds_left": 14130,
+                        "status": "will_drop_audience"
+                      }
+                    },
+                    {
+                      "segment_id": "seg_glowroot_premium_north",
+                      "held_version": 1,
+                      "held_copy": "mixed",
+                      "risk": "high",
+                      "on_server": {
+                        "action": "stop_after",
+                        "learned_at": "2026-11-24T21:11:39.029Z",
+                        "stop_at": "2026-11-24T21:26:39.029Z",
+                        "seconds_left": 630,
+                        "status": "will_stop"
+                      }
+                    }
+                  ],
+                  "revoked": [],
+                  "note": "Pull the snapshot and apply it. Until then, follow the head: stop any segment whose deadline passes. The hub does not send stop commands."
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {
+                "catalog_rev": 3,
+                "hash": "0b242904",
+                "state": "active",
+                "head_rev": 7,
+                "exceptions": [
+                  {
+                    "error": "apply_failed"
+                  }
+                ],
+                "locally_stopped": []
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/segments/{id}": {
+      "get": {
+        "summary": "Check a segment and its sync",
+        "description": "With include=sync: per server instance, the held copy (wider, narrower, same), what the server will do on its own, the hub action, exposure, and a per-cluster summary.",
+        "tags": [
+          "Observe"
+        ],
+        "x-who-calls": "AdOps, approvers, reporting",
+        "responses": {
+          "200": {
+            "description": "Example from the seeded demo",
+            "content": {
+              "application/json": {
+                "example": {
+                  "segment_id": "seg_glowroot_premium_north",
+                  "name": "GlowRoot Premium North",
+                  "advertiser_id": "adv_glowroot",
+                  "active_version": 1,
+                  "paused": false,
+                  "active": {
+                    "version": 1,
+                    "rule": {
+                      "must": [
+                        {
+                          "field": "device.geo.region",
+                          "in": [
+                            "IN-DL",
+                            "IN-HR"
+                          ]
+                        },
+                        {
+                          "field": "device.type",
+                          "in": [
+                            "desktop",
+                            "mobile"
+                          ]
+                        }
+                      ],
+                      "should": [
+                        {
+                          "tier": 1,
+                          "all": [
+                            {
+                              "field": "audience.purchase_skincare_30d",
+                              "eq": true,
+                              "consent_required": true
+                            },
+                            {
+                              "field": "site.cat",
+                              "in": [
+                                "IAB18-1"
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "tier": 2,
+                          "all": [
+                            {
+                              "field": "site.cat",
+                              "in": [
+                                "IAB18-1"
+                              ]
+                            }
+                          ]
+                        }
+                      ],
+                      "if_audience_missing": "fall_back_to_context",
+                      "strict_compliance": true,
+                      "audience_required": false
+                    },
+                    "deal_ids": [
+                      "MN-GLOW-PREMIUM-N"
+                    ],
+                    "fingerprint": "abf9a563",
+                    "effective_fingerprint": "683090d4"
+                  },
+                  "versions": [
+                    {
+                      "version": 1,
+                      "status": "active",
+                      "fingerprint": "abf9a563",
+                      "deal_ids": [
+                        "MN-GLOW-PREMIUM-N"
+                      ],
+                      "created_by": "priya",
+                      "created_at": "2026-11-24T15:17:08.997Z",
+                      "submitted_by": "priya",
+                      "approved_by": "rahul",
+                      "published_by": "rahul",
+                      "published_at": "2026-11-24T15:17:08.997Z",
+                      "blast_radius": {
+                        "vs_active": null,
+                        "new_version_change": "new_segment",
+                        "publish_risk": "none",
+                        "old_copy_would_be": "not_applicable",
+                        "stale_copy_risk": "none",
+                        "dimensions": [],
+                        "plain_language": "First live version of this segment. No earlier version to compare with."
+                      }
+                    }
+                  ],
+                  "history": [
+                    {
+                      "seq": 5,
+                      "ts": "2026-11-24T15:17:08.997Z",
+                      "actor": "priya",
+                      "role": "writer",
+                      "action": "create_segment",
+                      "segment_id": "seg_glowroot_premium_north",
+                      "version": 1,
+                      "detail": null
+                    },
+                    {
+                      "seq": 6,
+                      "ts": "2026-11-24T15:17:08.997Z",
+                      "actor": "priya",
+                      "role": "writer",
+                      "action": "submit",
+                      "segment_id": "seg_glowroot_premium_north",
+                      "version": 1,
+                      "detail": null
+                    },
+                    {
+                      "seq": 7,
+                      "ts": "2026-11-24T15:17:08.997Z",
+                      "actor": "rahul",
+                      "role": "approver",
+                      "action": "approve",
+                      "segment_id": "seg_glowroot_premium_north",
+                      "version": 1,
+                      "detail": null
+                    }
+                  ],
+                  "sync": {
+                    "catalog_rev": 7,
+                    "consumers": [
+                      {
+                        "consumer_id": "deal_tagger_1",
+                        "name": "Deal tagger 1",
+                        "cluster": "deal_tagger",
+                        "cluster_name": "Curated-deal tagger",
+                        "traffic_share": 0.1,
+                        "mode": "not_integrated",
+                        "state": "unknown",
+                        "held_rev": null,
+                        "received_rev": null,
+                        "held_version": null,
+                        "held_fingerprint": null,
+                        "active_fingerprint": "683090d4",
+                        "held_copy": null,
+                        "risk": null,
+                        "unreachable": false,
+                        "expiry_class": "strict",
+                        "on_server": null,
+                        "hub_action": "probe",
+                        "exposure_traffic_minutes": 0,
+                        "exceptions": [],
+                        "last_ack_at": null,
+                        "note": "Has never reported an active copy. Cannot judge, so it is unknown."
+                      },
+                      {
+                        "consumer_id": "edge_mum_1",
+                        "name": "Mumbai 1",
+                        "cluster": "mumbai",
+                        "cluster_name": "Edge ad servers, Mumbai",
+                        "traffic_share": 0.11,
+                        "mode": "deferred",
+                        "state": "confirmed_stale",
+                        "held_rev": 4,
+                        "received_rev": 4,
+                        "held_version": 1,
+                        "held_fingerprint": "b1d79b13",
+                        "active_fingerprint": "683090d4",
+                        "held_copy": "mixed",
+                        "risk": "high",
+                        "unreachable": false,
+                        "expiry_class": "strict",
+                        "on_server": {
+                          "action": "stop_after",
+                          "learned_at": "2026-11-24T21:16:09.056Z",
+                          "stop_at": "2026-11-24T21:31:09.056Z",
+                          "seconds_left": 900,
+                          "status": "will_stop"
+                        },
+                        "hub_action": "alert_p1_server_stops_at_deadline",
+                        "exposure_traffic_minutes": 0,
+                        "exceptions": [],
+                        "last_ack_at": "2026-11-24T21:16:09.064Z",
+                        "summary": "Mixed or unclassifiable difference, treated as wider (conservative). exclusions: exclusion set changed in both directions",
+                        "consent_critical": false,
+                        "stale_since": "2026-11-24T21:16:09.056Z",
+                        "stale_since_rev": 6,
+                        "minutes_behind": 0,
+                        "serving_wider_copy": true
+                      }
+                    ],
+                    "summary": {
+                      "instances": 8,
+                      "ack_coverage_pct": 87.5,
+                      "ack_coverage_traffic_pct": 90,
+                      "stale_version_traffic_share_pct": 32,
+                      "serving_wider_copy_share_pct": 32,
+                      "unknown_share_pct": 10,
+                      "stopped_locally": 0,
+                      "high_risk_stale_exposure_traffic_minutes": 0.3,
+                      "exposure_still_growing": true,
+                      "clusters": [
+                        {
+                          "cluster": "deal_tagger",
+                          "name": "Curated-deal tagger",
+                          "instances": 1,
+                          "in_sync": 0,
+                          "stale": 0,
+                          "unknown": 1,
+                          "traffic_share": 0.1,
+                          "one_report_per_cluster_would_say": "unclear",
+                          "hides_a_problem": false
+                        },
+                        {
+                          "cluster": "mumbai",
+                          "name": "Edge ad servers, Mumbai",
+                          "instances": 2,
+                          "in_sync": 0,
+                          "stale": 2,
+                          "unknown": 0,
+                          "traffic_share": 0.22,
+                          "one_report_per_cluster_would_say": "stale",
+                          "hides_a_problem": false
+                        }
+                      ],
+                      "note": "Traffic shares are simulated. Unknown servers are not counted as stale, which is why coverage sits next to the headline. Exposure is traffic share times minutes a wider copy stayed live beyond a 2 minute propagation window, kept as a running total. It needs server reports only, not impression logs."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "include",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "sync"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/v1/match": {
+      "post": {
+        "summary": "Test a request",
+        "description": "Which segments and deals an OpenRTB-style request is eligible for, with clause-level reasons. Replays against a catalog revision or a segment version, and compares with the active catalog. Persists ids and outcomes only.",
+        "tags": [
+          "Test"
+        ],
+        "x-who-calls": "AdOps, support",
+        "responses": {
+          "200": {
+            "description": "Example from the seeded demo",
+            "content": {
+              "application/json": {
+                "example": {
+                  "request_id": "req-1",
+                  "evaluated_against": {
+                    "type": "catalog_rev",
+                    "catalog_rev": 3
+                  },
+                  "normalised": {
+                    "region": "IN-DL",
+                    "country": "IND",
+                    "device": "mobile",
+                    "os": null,
+                    "domain": "glow-deals-feed.example",
+                    "categories": [
+                      "IAB18-1"
+                    ],
+                    "consent.valid": true,
+                    "audience.signals": 1
+                  },
+                  "matches": [
+                    {
+                      "segment_id": "seg_glowroot_premium_north",
+                      "version": 1,
+                      "tier": 1,
+                      "reason": "region IN-DL in [IN-DL, IN-HR]; device mobile in [desktop, mobile, tablet]; site not on excl_buyer_blocklist; tier 1: purchase_skincare_30d + category in [IAB18-1]",
+                      "deal_ids": [
+                        "MN-GLOW-PREMIUM-N"
+                      ]
+                    }
+                  ],
+                  "excluded": [
+                    {
+                      "segment_id": "seg_glowroot_festive_east",
+                      "reason": "region IN-DL not in [IN-WB]"
+                    }
+                  ],
+                  "meaning": "A match means the request is eligible for the segment and its deals. Whether an ad is then bid on, wins and serves is decided later, by the buyer and the auction.",
+                  "compare": {
+                    "held_rev": 3,
+                    "active_rev": 7,
+                    "diverges": true,
+                    "differences": [
+                      {
+                        "segment_id": "seg_glowroot_premium_north",
+                        "held": "eligible, tier 1",
+                        "active": "not eligible",
+                        "diverges": true
+                      }
+                    ],
+                    "active": {
+                      "matches": [],
+                      "excluded": [
+                        {
+                          "segment_id": "seg_glowroot_festive_east",
+                          "reason": "region IN-DL not in [IN-OD, IN-WB]"
+                        },
+                        {
+                          "segment_id": "seg_glowroot_premium_north",
+                          "reason": "site 'glow-deals-feed.example' is on exclusion list excl_buyer_blocklist (v4, entry glow-deals-feed.example)"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {
+                "id": "req-1",
+                "device": {
+                  "devicetype": 4,
+                  "geo": {
+                    "country": "IND",
+                    "region": "IN-DL"
+                  }
+                },
+                "site": {
+                  "domain": "glow-deals-feed.example",
+                  "cat": [
+                    "IAB18-1"
+                  ],
+                  "cattax": 1
+                },
+                "user": {
+                  "data": [
+                    {
+                      "id": "partner_a",
+                      "segment": [
+                        {
+                          "id": "purchase_skincare_30d"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "regs": {
+                  "gpp": "demo-gpp-granted"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "catalog_rev",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "compare",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active"
+              ]
+            }
+          },
+          {
+            "name": "segment_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    }
+  }
+}
