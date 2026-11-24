@@ -24,6 +24,58 @@
       "bearer": []
     }
   ],
+  "x-security-controls": [
+    [
+      "Authentication",
+      "Every call carries a bearer token. Each server instance has its own machine identity, and a report's sender comes from its token, never from the body.",
+      "POST /v1/consumers/edge_mum_1/acks with edge_us_1's token: 403 ack_identity_mismatch"
+    ],
+    [
+      "Roles",
+      "Writers author, approvers approve, readers read, machines pull and report. People cannot pull the catalog; machines cannot write rules.",
+      "GET /v1/catalog/snapshot as AdOps: 403 forbidden"
+    ],
+    [
+      "Four-eyes",
+      "Anything that can widen reach (approve, publish, resume, removing a site from a list) needs a second person. The creator of a version cannot approve it, even as admin. Anything that only stops or narrows needs one person and a reason.",
+      "The creator approves as admin: 403 four_eyes_violation"
+    ],
+    [
+      "Tenant isolation",
+      "A team sees only its own advertisers' segments and lists. Others get 404, not 403, so they cannot learn that a segment exists.",
+      "GET a GlowRoot segment as another advertiser: 404 segment_not_found"
+    ],
+    [
+      "Integrity",
+      "The head and every snapshot are signed with a body digest; servers verify before applying. Reports carry the hash of the copy held; a mismatch is 409 and the copy is treated as corrupt. Cold starts fetch a short-lived signed URL without the bearer token, so the token never reaches the object store.",
+      "A report with a wrong hash: 409 hash_mismatch"
+    ],
+    [
+      "Safe writes",
+      "Versions are immutable. Idempotency-Key replays the first answer and refuses a reused key with a different body (422). Publish, rollback, stop and list changes require a reason, and every action is audited with who and when.",
+      "Same Idempotency-Key, different body: 422 idempotency_key_reuse"
+    ],
+    [
+      "Privacy",
+      "No user profiles are stored. /v1/match logs request ids, outcomes and versions only. Audience conditions are tagged consent_required automatically, and no rollback may loosen consent.",
+      "Rollback that loosens consent: 403 rollback_loosens_consent"
+    ],
+    [
+      "Abuse limits",
+      "Bodies over 200 KB and oversized rules are refused (413). Unknown fields are refused with a did-you-mean (400). Calls are rate limited (429).",
+      "A typo in a field name: 400 with a suggestion"
+    ],
+    [
+      "Off the bid path",
+      "The hub is never called during an auction, so an outage or an attack on the hub cannot slow or change a bid.",
+      "POST /v1/demo/hub-outage: no correct copy stops"
+    ],
+    [
+      "Production adds",
+      "Mutual TLS or OAuth2 client credentials for machines, the company identity provider for people, asymmetric signing with key rotation (servers verify, never forge), rate limits per service identity, append-only audit storage.",
+      null
+    ]
+  ],
   "x-errors": {
     "format": {
       "error": "machine_code",
@@ -305,7 +357,7 @@
                       "version": 1,
                       "created_by": "seed",
                       "approved_by": null,
-                      "created_at": "2026-11-24T15:16:08.993Z",
+                      "created_at": "2026-11-24T15:38:09.519Z",
                       "added": [],
                       "removed": [],
                       "reason": "Buyer blocklist at launch"
@@ -314,7 +366,7 @@
                       "version": 2,
                       "created_by": "priya",
                       "approved_by": null,
-                      "created_at": "2026-11-24T21:11:09.028Z",
+                      "created_at": "2026-11-24T21:33:09.540Z",
                       "added": [
                         "glow-deals-feed.example"
                       ],
@@ -325,7 +377,7 @@
                       "version": 3,
                       "created_by": "priya",
                       "approved_by": null,
-                      "created_at": "2026-11-24T21:16:09.056Z",
+                      "created_at": "2026-11-24T21:38:09.564Z",
                       "added": [
                         "new-spam.example"
                       ],
@@ -389,7 +441,7 @@
                       "viral-feed.example"
                     ],
                     "created_by": "priya",
-                    "created_at": "2026-11-24T21:16:09.064Z",
+                    "created_at": "2026-11-24T21:38:09.571Z",
                     "reason": "Buyer unblocked the site"
                   },
                   "next": "approve, by someone other than priya",
@@ -545,7 +597,7 @@
                 "example": {
                   "catalog_rev": 7,
                   "hash": "42ac4889",
-                  "published_at": "2026-11-24T21:16:09.064Z",
+                  "published_at": "2026-11-24T21:38:09.571Z",
                   "revoked": [],
                   "segments": {
                     "seg_glowroot_festive_east": {
@@ -636,8 +688,8 @@
                   "mode": "object_url",
                   "reason": "cold start",
                   "catalog_rev": 7,
-                  "url": "/v1/catalog/objects/rev-7.json?exp=1795555269070&sig=sig_fc793b77d6a2e75b",
-                  "expires_at": "2026-11-24T21:21:09.070Z",
+                  "url": "/v1/catalog/objects/rev-7.json?exp=1795556589576&sig=sig_948b3aafc8aa6938",
+                  "expires_at": "2026-11-24T21:43:09.576Z",
                   "body_digest": "b0fb6f98"
                 }
               }
@@ -694,8 +746,8 @@
                       "risk": "high",
                       "on_server": {
                         "action": "context_only_after",
-                        "learned_at": "2026-11-24T21:11:39.029Z",
-                        "stop_at": "2026-11-25T01:11:39.029Z",
+                        "learned_at": "2026-11-24T21:33:39.540Z",
+                        "stop_at": "2026-11-25T01:33:39.540Z",
                         "seconds_left": 14130,
                         "status": "will_drop_audience"
                       }
@@ -707,8 +759,8 @@
                       "risk": "high",
                       "on_server": {
                         "action": "stop_after",
-                        "learned_at": "2026-11-24T21:11:39.029Z",
-                        "stop_at": "2026-11-24T21:26:39.029Z",
+                        "learned_at": "2026-11-24T21:33:39.540Z",
+                        "stop_at": "2026-11-24T21:48:39.540Z",
                         "seconds_left": 630,
                         "status": "will_stop"
                       }
@@ -827,11 +879,11 @@
                         "MN-GLOW-PREMIUM-N"
                       ],
                       "created_by": "priya",
-                      "created_at": "2026-11-24T15:17:08.997Z",
+                      "created_at": "2026-11-24T15:39:09.521Z",
                       "submitted_by": "priya",
                       "approved_by": "rahul",
                       "published_by": "rahul",
-                      "published_at": "2026-11-24T15:17:08.997Z",
+                      "published_at": "2026-11-24T15:39:09.521Z",
                       "blast_radius": {
                         "vs_active": null,
                         "new_version_change": "new_segment",
@@ -846,7 +898,7 @@
                   "history": [
                     {
                       "seq": 5,
-                      "ts": "2026-11-24T15:17:08.997Z",
+                      "ts": "2026-11-24T15:39:09.521Z",
                       "actor": "priya",
                       "role": "writer",
                       "action": "create_segment",
@@ -856,7 +908,7 @@
                     },
                     {
                       "seq": 6,
-                      "ts": "2026-11-24T15:17:08.997Z",
+                      "ts": "2026-11-24T15:39:09.521Z",
                       "actor": "priya",
                       "role": "writer",
                       "action": "submit",
@@ -866,7 +918,7 @@
                     },
                     {
                       "seq": 7,
-                      "ts": "2026-11-24T15:17:08.997Z",
+                      "ts": "2026-11-24T15:39:09.521Z",
                       "actor": "rahul",
                       "role": "approver",
                       "action": "approve",
@@ -921,18 +973,18 @@
                         "expiry_class": "strict",
                         "on_server": {
                           "action": "stop_after",
-                          "learned_at": "2026-11-24T21:16:09.056Z",
-                          "stop_at": "2026-11-24T21:31:09.056Z",
+                          "learned_at": "2026-11-24T21:38:09.564Z",
+                          "stop_at": "2026-11-24T21:53:09.564Z",
                           "seconds_left": 900,
                           "status": "will_stop"
                         },
                         "hub_action": "alert_p1_server_stops_at_deadline",
                         "exposure_traffic_minutes": 0,
                         "exceptions": [],
-                        "last_ack_at": "2026-11-24T21:16:09.064Z",
+                        "last_ack_at": "2026-11-24T21:38:09.571Z",
                         "summary": "Mixed or unclassifiable difference, treated as wider (conservative). exclusions: exclusion set changed in both directions",
                         "consent_critical": false,
-                        "stale_since": "2026-11-24T21:16:09.056Z",
+                        "stale_since": "2026-11-24T21:38:09.564Z",
                         "stale_since_rev": 6,
                         "minutes_behind": 0,
                         "serving_wider_copy": true

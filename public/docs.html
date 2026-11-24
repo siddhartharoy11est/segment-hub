@@ -24,6 +24,11 @@ a{color:var(--acc)}
 pre{background:var(--code);border-radius:8px;padding:10px;overflow:auto;font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;max-height:380px;margin:6px 0}
 details>summary{cursor:pointer;color:var(--mut);font-size:13px;margin:6px 0}
 table{border-collapse:collapse;width:100%;font-size:13.5px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--mut);font-size:12px}
+.idx{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:4px 18px;margin:0;padding:0;list-style:none}
+.idx a{display:flex;gap:8px;align-items:center;text-decoration:none;color:var(--ink);padding:4px 0;font-size:13.5px}
+.idx a:hover .path{color:var(--acc)}
+.sec td:first-child{font-weight:650;white-space:nowrap}.sec td:last-child{font:12px ui-monospace,Menlo,Consolas,monospace;color:var(--mut)}
+.card{scroll-margin-top:12px}h2{scroll-margin-top:12px}
 .chroma img{width:64px;height:64px;display:block}
 @media (prefers-reduced-motion:no-preference){.chroma img{animation:in .35s ease-out both}@keyframes in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}}
 @media(max-width:640px){.chroma{display:none}}
@@ -52,12 +57,22 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}th,td{text-align:left
       el('p', { class: 'small muted', style: 'margin:8px 0 0' }, 'Auth: ', spec.components.securitySchemes.bearer.description)));
     var ops = [];
     Object.keys(spec.paths).forEach(function (p) { Object.keys(spec.paths[p]).forEach(function (m) { ops.push({ path: p, method: m.toUpperCase(), op: spec.paths[p][m] }); }); });
+    ops.sort(function (a, b) { return ORDER.indexOf(a.op.tags[0]) - ORDER.indexOf(b.op.tags[0]); });
+    ops.forEach(function (o, i) { o.id = 'op-' + (i + 1); });
+    root.append(el('div', { class: 'card' }, el('b', {}, 'Endpoints'), el('span', { class: 'small muted' }, ' in the order a change travels. Jump to '), el('a', { href: '#security', class: 'small' }, 'Security'), el('span', { class: 'small muted' }, ' or '), el('a', { href: '#errors', class: 'small' }, 'Errors'),
+      el('ul', { class: 'idx', style: 'margin-top:8px' }, ops.map(function (o) {
+        return el('li', {}, el('a', { href: '#' + o.id }, el('span', { class: 'm ' + o.method }, o.method), el('span', {}, el('span', { class: 'path' }, o.path), el('span', { class: 'muted' }, '  ' + o.op.summary))));
+      }))));
+    var sc = spec['x-security-controls'] || [];
+    root.append(el('h2', { id: 'security' }, 'Security'), el('div', { class: 'card sec' },
+      el('div', { class: 'small', style: 'margin-bottom:6px' }, 'Every control below is built and covered by the automated tests. The right-hand column is a call you can make to see it refuse.'),
+      el('table', {}, el('tr', {}, el('th', {}, 'Control'), el('th', {}, 'What it does'), el('th', {}, 'See it')), sc.map(function (c) { return el('tr', {}, el('td', {}, c[0]), el('td', {}, c[1]), el('td', {}, c[2] || '')); }))));
     ORDER.forEach(function (tag) {
       var list = ops.filter(function (o) { return o.op.tags[0] === tag; });
       if (!list.length) return;
       root.append(el('h2', {}, tag));
       list.forEach(function (o) {
-        var card = el('div', { class: 'card' },
+        var card = el('div', { class: 'card', id: o.id },
           el('div', {}, el('span', { class: 'm ' + o.method }, o.method), el('span', { class: 'path' }, o.path)),
           el('h3', { style: 'margin-top:8px' }, o.op.summary),
           el('div', { class: 'small' }, o.op.description),
@@ -72,8 +87,9 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}th,td{text-align:left
       });
     });
     var errs = spec['x-errors'];
-    root.append(el('h2', {}, 'Errors'), el('div', { class: 'card' }, el('div', { class: 'small' }, 'Every error has the same shape: '), pre(errs.format),
+    root.append(el('h2', { id: 'errors' }, 'Errors'), el('div', { class: 'card' }, el('div', { class: 'small' }, 'Every error has the same shape: '), pre(errs.format),
       el('table', {}, el('tr', {}, el('th', {}, 'Status'), el('th', {}, 'Meaning')), Object.keys(errs.codes).map(function (c) { return el('tr', {}, el('td', {}, c), el('td', {}, errs.codes[c])); }))));
+    if (location.hash) { var t = document.getElementById(location.hash.slice(1)); if (t) t.scrollIntoView(); }
   }).catch(function (e) { document.getElementById('root').textContent = 'Could not load openapi.json: ' + e.message; });
 })();
 </script>

@@ -12,7 +12,7 @@
 
   // Default pain names. If about.md has a legend block with "**Pain A: ...**" the names there win.
   var PAINS = { A: 'a wrong rule goes live', B: 'ad servers run an out-of-date rule' };
-  var VISUALS = ['problem-flow', 'metric-tree', 'break-even', 'example-calc'];
+  var VISUALS = ['brief-map', 'problem-flow', 'metric-tree', 'break-even', 'example-calc'];
   // Rows of the policy table (4.2) that can be tried elsewhere in the prototype.
   var EXPLORER_TRY = { 0: ['story', 'Run Request 4 on the Story tab'], 1: ['story', 'Replay the incident on the Story tab'], 7: ['sync', 'Cut off a server on the Sync board'] };
 
@@ -283,7 +283,26 @@
         { label: 'Value per incident avoided', get: function (r) { return fmtINR(r.perIncident); } },
         { label: 'Incidents a year to break even', big: true, get: function (r) { return r.incidents == null ? 'n/a' : String(r.incidents); } }] });
   }
-  function visual(name) {
+  // The first thing a reviewer sees: each part of the brief, and where to find it.
+  var BRIEF_MAP = [
+    ['Key endpoints', 'Nine endpoints, in the order a change travels: author, approve, distribute, confirm, test. Each is pre-filled and can be sent.', 'API explorer', 'tab:api'],
+    ['Request and response formats', 'Every endpoint with a real request and response from this code, and one error shape for all of them.', 'API reference', 'docs'],
+    ['Security', 'Who can call what, four-eyes on anything that widens reach, tenant isolation, signed copies, audit, privacy.', 'Security controls', 'docs#security'],
+    ['The problem I chose inside the brief', 'A buyer blocks a site and one ad server silently misses the update. The hub finds that one server, and the server stops the segment itself.', 'Replay it, 1 minute', 'tab:story']
+  ];
+  function briefMap(ctx) {
+    var rows = BRIEF_MAP.map(function (r) {
+      var go = r[3].indexOf('tab:') === 0
+        ? el('button', { type: 'button', class: 'sm' + (r[3] === 'tab:story' ? ' pri' : ''), onclick: function () { ctx.go(r[3].slice(4)); } }, r[2] + ' >')
+        : el('a', { class: 'bm-link', href: r[3] }, r[2] + ' >');
+      return el('div', { class: 'bm-row' }, el('div', { class: 'bm-k' }, r[0]), el('div', { class: 'bm-v' }, r[1]), el('div', { class: 'bm-go' }, go));
+    });
+    return el('section', { class: 'bmap', 'aria-label': 'The brief, and where to find each part' },
+      el('div', { class: 'bm-h' }, el('b', {}, 'For reviewers: the brief, and where to find it'), el('span', { class: 'muted small' }, 'Topic 3: an internal API for targeting segments. About 3 minutes.')),
+      rows);
+  }
+  function visual(name, ctx) {
+    if (name === 'brief-map') return briefMap(ctx);
     if (name === 'problem-flow') return problemFlow();
     if (name === 'metric-tree') return metricTree();
     if (name === 'break-even') return breakEvenCalc();
@@ -344,7 +363,7 @@
       if (b.type === 'quote') { cur.append(el('blockquote', {}, inline(b.text, ctx))); return; }
       if (b.type === 'list') { cur.append(el('ul', { class: 'alist' }, b.items.map(function (x) { return el('li', {}, inline(x, ctx)); }))); return; }
       if (b.type === 'table') { cur.append(buildTable(b, ctx)); return; }
-      if (b.type === 'visual') { cur.append(visual(b.name)); return; }
+      if (b.type === 'visual') { cur.append(visual(b.name, ctx)); return; }
       if (b.type === 'legend') {
         cur.append(el('div', { class: 'legend' }, el('span', { class: 'muted small' }, 'Pain points:'), painChip('A', ctx, true), painChip('B', ctx, true), el('span', { class: 'muted small' }, 'Press one to highlight its endpoints.')));
         return;
@@ -415,6 +434,14 @@
     '.greet .gact{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}',
     '@keyframes abIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}',
     '@media (prefers-reduced-motion:reduce){.greet .bubble{animation:none}}',
+    '.bmap{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:12px;padding:12px 16px;margin:14px 0 6px}',
+    '.bmap .bm-h{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;margin-bottom:6px}',
+    '.bmap .bm-row{display:grid;grid-template-columns:200px 1fr auto;gap:4px 16px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}',
+    '.bmap .bm-k{font-weight:650}.bmap .bm-v{color:var(--mut);font-size:14px;line-height:1.45}',
+    '.bmap .bm-go{justify-self:end}.bmap .bm-go button,.bmap .bm-link{white-space:nowrap}',
+    '.bmap .bm-link{display:inline-block;border:1px solid var(--line);border-radius:8px;padding:3px 8px;font-size:12.5px;text-decoration:none;color:var(--ink)}',
+    '.bmap .bm-link:hover{border-color:var(--acc)}',
+    '@media(max-width:700px){.bmap .bm-row{grid-template-columns:1fr}.bmap .bm-go{justify-self:start}}',
     '.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:18px 0 6px}',
     '.sec{background:var(--card);border:1px solid var(--line);border-radius:12px;margin:10px 0;scroll-margin-top:12px}',
     '.sec>summary{cursor:pointer;list-style:none;display:flex;gap:12px;align-items:center;padding:14px 16px;font-size:17px;font-weight:650;color:var(--ink);margin:0}',

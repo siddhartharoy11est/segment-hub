@@ -61,6 +61,18 @@ const spec = {
   servers: [{ url: '/' }],
   components: { securitySchemes: { bearer: { type: 'http', scheme: 'bearer', description: 'Demo tokens identify people (writer, approver, reader, admin) and machines (one per server instance). Production: OAuth2 client credentials or mutual TLS for machines, the company identity provider for people.' } } },
   security: [{ bearer: [] }],
+  'x-security-controls': [
+    ['Authentication', 'Every call carries a bearer token. Each server instance has its own machine identity, and a report\'s sender comes from its token, never from the body.', 'POST /v1/consumers/edge_mum_1/acks with edge_us_1\'s token: 403 ack_identity_mismatch'],
+    ['Roles', 'Writers author, approvers approve, readers read, machines pull and report. People cannot pull the catalog; machines cannot write rules.', 'GET /v1/catalog/snapshot as AdOps: 403 forbidden'],
+    ['Four-eyes', 'Anything that can widen reach (approve, publish, resume, removing a site from a list) needs a second person. The creator of a version cannot approve it, even as admin. Anything that only stops or narrows needs one person and a reason.', 'The creator approves as admin: 403 four_eyes_violation'],
+    ['Tenant isolation', 'A team sees only its own advertisers\' segments and lists. Others get 404, not 403, so they cannot learn that a segment exists.', 'GET a GlowRoot segment as another advertiser: 404 segment_not_found'],
+    ['Integrity', 'The head and every snapshot are signed with a body digest; servers verify before applying. Reports carry the hash of the copy held; a mismatch is 409 and the copy is treated as corrupt. Cold starts fetch a short-lived signed URL without the bearer token, so the token never reaches the object store.', 'A report with a wrong hash: 409 hash_mismatch'],
+    ['Safe writes', 'Versions are immutable. Idempotency-Key replays the first answer and refuses a reused key with a different body (422). Publish, rollback, stop and list changes require a reason, and every action is audited with who and when.', 'Same Idempotency-Key, different body: 422 idempotency_key_reuse'],
+    ['Privacy', 'No user profiles are stored. /v1/match logs request ids, outcomes and versions only. Audience conditions are tagged consent_required automatically, and no rollback may loosen consent.', 'Rollback that loosens consent: 403 rollback_loosens_consent'],
+    ['Abuse limits', 'Bodies over 200 KB and oversized rules are refused (413). Unknown fields are refused with a did-you-mean (400). Calls are rate limited (429).', 'A typo in a field name: 400 with a suggestion'],
+    ['Off the bid path', 'The hub is never called during an auction, so an outage or an attack on the hub cannot slow or change a bid.', 'POST /v1/demo/hub-outage: no correct copy stops'],
+    ['Production adds', 'Mutual TLS or OAuth2 client credentials for machines, the company identity provider for people, asymmetric signing with key rotation (servers verify, never forge), rate limits per service identity, append-only audit storage.', null]
+  ],
   'x-errors': { format: { error: 'machine_code', message: 'human sentence', path: 'where in the body, when relevant' },
     codes: { 400: 'invalid body or rule, with a did-you-mean where possible', 401: 'no or unknown token', 403: 'role or four-eyes refusal', 404: 'not found, or not visible to your advertiser', 409: 'wrong state, duplicate, or corrupt copy (hash mismatch)', 413: 'rule too large', 422: 'idempotency key reused with a different body', 429: 'rate or prototype limit', 503: 'hub API down; the head stays readable from object storage' } },
   paths: {

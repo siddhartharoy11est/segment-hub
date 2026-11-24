@@ -2,14 +2,18 @@
 Hi, I'm Sid. Thanks for taking the time to look at this. This page walks you through how I thought about the problem and what I built over the last two days. The prototype is made to be tried, so please click around. I'd love to talk it through with you.
 [[/GREETING]]
 
+[[VISUAL: brief-map]]
+
 # About This Project
 
 **Prototype for the Media.net APM case, Topic 3**
 
 ## Segment Hub
-*Confirm that every ad server is running the targeting rule that was published.*
+*An internal API to define, approve and ship targeting segments, and prove that every ad server runs them.*
 
-Segment Hub is an internal API for targeting segments. A team defines who an ad may reach, tests the rule, publishes it with a second person's approval, and then sees whether every ad server is running that version. It is a control plane: matching at bid speed stays inside the ad servers. When a server is behind, the hub works out whether its copy is wider or narrower than the active one. A narrower copy only under-delivers, so it keeps serving. A wider copy of a strict segment is stopped by the server itself, at a deadline the hub ships in a small signed document every server reads. The hub never sends stop commands.
+Segment Hub is an internal API for targeting segments. AdOps defines who a curated deal may reach, tests the rule against sample bid requests, and publishes it with a second person's approval. Ad servers pull the approved rules, match locally at bid speed, and report which version they run, so the hub can show, server by server, whether the rule that was approved is the rule that is live.
+
+**The problem I chose inside the brief.** A buyer blocks a site, and one ad server silently misses the update, so the deal stays eligible where the buyer said no. The hub finds that one server, and the server stops the segment itself, at a deadline the hub shipped ahead of time. The hub never sends stop commands.
 
 All data in this prototype is simulated for demonstration. The brand (GlowRoot, a skincare advertiser), the people and the ad servers are fictional.
 
@@ -225,6 +229,24 @@ The hub depends on the ad servers. This is the minimum contract, and what they g
 | Signatures, logins, traffic and ad server clusters | Simulated. Tokens are fixed demo tokens and signatures are a hash with a demo key |
 
 **What production would need.** A database for segments, versions and the audit trail. Object storage or a CDN for signed snapshots and the head. Asymmetric signing with key rotation, so that consumers verify with a public key and cannot forge a snapshot. A real identity provider, and rate limits by service identity rather than by address. A shared set of golden test cases, so that the hub and the real ad servers return the same answer for every rule. The automated tests here are the start of that set.
+
+### 4.6 Security
+
+Security is part of the contract, not a layer on top. Each control below is built and tested, and most can be seen working in the API explorer.
+
+| Control | What it does | See it |
+|---|---|---|
+| **Authentication** | Every call carries a bearer token. Each server instance has its own machine identity, and a report's sender comes from its token, never from the body | Report as edge_us_1 for edge_mum_1: 403 |
+| **Roles** | Writers author, approvers approve, readers read, machines pull and report. People cannot pull the catalog and machines cannot write rules | AdOps pulls the snapshot: 403 |
+| **Four-eyes** | Anything that can widen reach needs a second person. The creator of a version cannot approve it, even as admin | AdOps tries to approve: 403. The creator approving as admin: 403 (Tests tab) |
+| **Tenant isolation** | A team sees only its own advertisers' segments and lists. Others get 404, not 403, so they cannot even learn a segment exists | Another advertiser's writer: 404 |
+| **Integrity** | The head and every snapshot are signed with a body digest, and servers verify before applying. A report carries the hash of what it holds; a mismatch is 409 and the copy is treated as corrupt. A cold start fetches a short-lived signed URL without the bearer token | A wrong hash: 409. A tampered head fails verification (Tests tab) |
+| **Safe writes** | Versions are immutable. Idempotency keys replay the first answer and refuse a reused key with a different body. Publish, rollback, stop and list changes need a reason, and every action is in the audit log with who and when | Tests tab, "idempotency" |
+| **Privacy** | The hub holds no user profiles. `/match` logs only request ids, outcomes and versions. Audience rules are tagged as needing consent automatically, and no rollback may loosen consent | Tests tab, "persists no user data" |
+| **Abuse limits** | Bodies over 200 KB and oversized rules are refused (413), unknown fields get a did-you-mean (400), and calls are rate limited | Explorer: "A typo in a field name" |
+| **Off the bid path** | The hub is never called during an auction, so an outage or an attack on the hub cannot slow or change a bid | Story tab: take the hub down for 20 minutes |
+
+**What production adds.** Mutual TLS or OAuth2 client credentials for machines and the company identity provider for people, asymmetric signing with key rotation so servers can verify a copy but never forge one, rate limits per service identity rather than per address, and the audit log in append-only storage.
 
 ---
 
